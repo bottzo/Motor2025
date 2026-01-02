@@ -1,0 +1,5 @@
+﻿  The vcpkg manifest was disabled, but we found a manifest file in C:\Users\aalca\Documents\GitHub\Motor2025\Engine\. You may want to enable vcpkg manifests in your properties page or pass /p:VcpkgEnableManifest=true to the msbuild invocation.
+  dllmain.cpp
+  Scripting.vcxproj -> C:\Users\aalca\Documents\GitHub\Motor2025\Engine\build\x64\Debug\Scripting.dll
+  "pwsh.exe" no se reconoce como un comando interno o externo,
+  programa o archivo por lotes ejecutable.
