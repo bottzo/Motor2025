@@ -6,6 +6,8 @@
 #include "ComponentCamera.h"
 #include "ComponentRotate.h"
 #include <nlohmann/json.hpp>
+#include "ComponentScript.h"
+#include "Log.h"
 
 GameObject::GameObject(const std::string& name) : name(name), active(true), parent(nullptr) {
     CreateComponent(ComponentType::TRANSFORM);
@@ -42,6 +44,7 @@ Component* GameObject::CreateComponent(ComponentType type) {
         }
         newComponent = new ComponentMaterial(this);
         break;
+
     case ComponentType::CAMERA:
         if (GetComponent(ComponentType::CAMERA) != nullptr) {
             return GetComponent(ComponentType::CAMERA);
@@ -51,6 +54,10 @@ Component* GameObject::CreateComponent(ComponentType type) {
 
     case ComponentType::ROTATE:
         newComponent = new ComponentRotate(this);
+        break;
+
+    case ComponentType::SCRIPT:
+        newComponent = new ComponentScript(this);
         break;
 
     default:
@@ -141,14 +148,21 @@ int GameObject::GetChildIndex(GameObject* child) const {
 void GameObject::Update() {
     if (!active) return;
 
-    for (auto* component : components) {
-        if (component->IsActive()) {
+    std::vector<Component*> componentsToUpdate = components;
+
+    for (Component* component : componentsToUpdate) {
+        // Verificar que el componente sigue siendo válido y está activo
+        if (component && component->IsActive()) {
             component->Update();
         }
     }
 
-    for (auto* child : children) {
-        child->Update();
+    std::vector<GameObject*> childrenToUpdate = children;
+
+    for (GameObject* child : childrenToUpdate) {
+        if (child && child->IsActive()) {
+            child->Update();
+        }
     }
 }
 
@@ -212,7 +226,8 @@ GameObject* GameObject::Deserialize(const nlohmann::json& gameObjectObj, GameObj
             Component* component = nullptr;
             if (type == ComponentType::TRANSFORM) {
                 component = newObject->GetComponent(ComponentType::TRANSFORM);
-            } else {
+            }
+            else {
                 component = newObject->CreateComponent(type);
             }
 

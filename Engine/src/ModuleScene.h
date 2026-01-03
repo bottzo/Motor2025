@@ -50,5 +50,8 @@ private:
     Renderer* renderer = nullptr;
     FileSystem* filesystem = nullptr;
 
+    // Deferred GameObject creation
+    std::vector<GameObject*> pendingGameObjects;
+
     ComponentCamera* FindCameraInHierarchy(GameObject* obj);
 };

@@ -413,6 +413,16 @@ void ModuleEditor::ShowMenuBar()
                 }
             }
 
+            if (ImGui::MenuItem("Add Script Component"))  
+            {
+                GameObject* selected = Application::GetInstance().selectionManager->GetSelectedObject();
+                if (selected != nullptr)
+                {
+                    selected->CreateComponent(ComponentType::SCRIPT);
+                    LOG_CONSOLE("Script component added to %s", selected->GetName().c_str());
+                }
+            }
+
             ImGui::EndMenu();
         }
 

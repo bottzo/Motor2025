@@ -61,6 +61,7 @@ set(UTILS_SRC
     src/Octree.cpp
     src/ModuleScripting.h
     src/ModuleScripting.cpp
+    src/ScriptingAPI.h
 )
 
 set(GAMEOBJECTS_SRC 
@@ -83,6 +84,8 @@ set(COMPONENTS_SRC
     src/ComponentCamera.h
     src/ComponentRotate.cpp
     src/ComponentRotate.h
+    src/ComponentScript.cpp
+    src/ComponentScript.h
 )
 
 set(LOADERS_SRC 

@@ -1,4 +1,4 @@
-#include "InspectorWindow.h"
+﻿#include "InspectorWindow.h"
 #include <imgui.h>
 #include "Application.h"
 #include "GameObject.h"
@@ -10,6 +10,7 @@
 #include "ComponentRotate.h"
 #include "ResourceTexture.h"
 #include "Log.h"
+#include "ComponentScript.h"
 
 InspectorWindow::InspectorWindow()
     : EditorWindow("Inspector")
@@ -75,11 +76,15 @@ void InspectorWindow::Draw()
     DrawGizmoSettings();
     ImGui::Separator();
 
+    // Dibuja todos los componentes existentes
     DrawTransformComponent(selectedObject);
     DrawCameraComponent(selectedObject);
     DrawMeshComponent(selectedObject);
     DrawMaterialComponent(selectedObject);
     DrawRotateComponent(selectedObject);
+    DrawScriptComponent(selectedObject);
+    ImGui::Separator();
+    DrawAddComponentSection(selectedObject);
 
     ImGui::End();
 }
@@ -252,7 +257,7 @@ void InspectorWindow::DrawTransformComponent(GameObject* selectedObject)
             transform->SetRotation(glm::vec3(0.0f, 0.0f, 0.0f));
             transform->SetScale(glm::vec3(1.0f, 1.0f, 1.0f));
 
-            // Rebuild despu�s de reset
+            //  rebuild luego de resete
             Application::GetInstance().scene->MarkOctreeForRebuild();
 
             LOG_DEBUG("Transform reset for: %s", selectedObject->GetName().c_str());
@@ -789,6 +794,20 @@ void InspectorWindow::DrawRotateComponent(GameObject* selectedObject)
     }
 }
 
+void InspectorWindow::DrawScriptComponent(GameObject* selectedObject)
+{
+    ComponentScript* scriptComp = static_cast<ComponentScript*>(
+        selectedObject->GetComponent(ComponentType::SCRIPT)
+        );
+
+    if (scriptComp == nullptr) return;
+
+    if (ImGui::CollapsingHeader("Script", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        scriptComp->OnEditor();
+    }
+}
+
 bool InspectorWindow::DrawGameObjectSection(GameObject* selectedObject)
 {
     bool objectDeleted = false;
@@ -894,4 +913,84 @@ bool InspectorWindow::IsDescendantOf(GameObject* potentialDescendant, GameObject
     }
 
     return false;
+}
+
+void InspectorWindow::DrawAddComponentSection(GameObject* selectedObject)
+{
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Spacing();
+
+    ImGui::Text("Add Component:");
+    ImGui::Spacing();
+
+    ComponentScript* scriptComp = static_cast<ComponentScript*>(
+        selectedObject->GetComponent(ComponentType::SCRIPT)
+        );
+
+    if (scriptComp == nullptr)
+    {
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.6f, 0.8f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.7f, 0.9f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.1f, 0.5f, 0.7f, 1.0f));
+
+        if (ImGui::Button("Add Script Component", ImVec2(-1, 0)))
+        {
+            Component* newScript = selectedObject->CreateComponent(ComponentType::SCRIPT);
+
+            if (newScript)
+            {
+                LOG_DEBUG("Added Script Component to '%s'", selectedObject->GetName().c_str());
+                LOG_CONSOLE("Script Component added to '%s'", selectedObject->GetName().c_str());
+            }
+        }
+
+        ImGui::PopStyleColor(3);
+
+        if (ImGui::IsItemHovered())
+        {
+            ImGui::BeginTooltip();
+            ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), "Add Script Component");
+            ImGui::Separator();
+            ImGui::Text("Adds a script component to this GameObject");
+            ImGui::Text("allowing it to execute custom behavior");
+            ImGui::EndTooltip();
+        }
+    }
+    else
+    {
+        ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f), "Script Component already added");
+    }
+
+    ImGui::Spacing();
+
+    // Botón para añadir Rotate Component (ejemplo)
+    ComponentRotate* rotateComp = static_cast<ComponentRotate*>(
+        selectedObject->GetComponent(ComponentType::ROTATE)
+        );
+
+    if (rotateComp == nullptr)
+    {
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.6f, 0.4f, 0.8f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.7f, 0.5f, 0.9f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.5f, 0.3f, 0.7f, 1.0f));
+
+        if (ImGui::Button("Add Rotate Component", ImVec2(-1, 0)))
+        {
+            Component* newRotate = selectedObject->CreateComponent(ComponentType::ROTATE);
+
+            if (newRotate)
+            {
+                LOG_DEBUG("Added Rotate Component to '%s'", selectedObject->GetName().c_str());
+                LOG_CONSOLE("Rotate Component added to '%s'", selectedObject->GetName().c_str());
+            }
+        }
+
+        ImGui::PopStyleColor(3);
+
+        if (ImGui::IsItemHovered())
+        {
+            ImGui::SetTooltip("Adds automatic rotation behavior");
+        }
+    }
 }
