@@ -1,0 +1,10 @@
+﻿  The vcpkg manifest was disabled, but we found a manifest file in C:\Users\aalca\Documents\GitHub\Motor2025\Engine\. You may want to enable vcpkg manifests in your properties page or pass /p:VcpkgEnableManifest=true to the msbuild invocation.
+  pch.cpp
+  dllmain.cpp
+C:\Users\aalca\Documents\GitHub\Motor2025\Engine\Scripting\dllmain.cpp(101,20): warning C4267: 'initializing': conversion from 'size_t' to 'int', possible loss of data
+  (compiling source file '/dllmain.cpp')
+  
+     Creating library C:\Users\aalca\Documents\GitHub\Motor2025\Engine\Scripting\x64\Debug\Scripting.lib and object C:\Users\aalca\Documents\GitHub\Motor2025\Engine\Scripting\x64\Debug\Scripting.exp
+  Scripting.vcxproj -> C:\Users\aalca\Documents\GitHub\Motor2025\Engine\Scripting\x64\Debug\Scripting.dll
+  "pwsh.exe" no se reconoce como un comando interno o externo,
+  programa o archivo por lotes ejecutable.

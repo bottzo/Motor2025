@@ -32,7 +32,7 @@ public:
     bool IsScriptLoaded() const { return scriptLoaded; }
 
 private:
-    bool CheckForReload();
+    bool CheckForDllChange();
     void CleanupTempDLL();
 
     std::string scriptName = "None";
@@ -41,8 +41,7 @@ private:
 
     // Hot-reload support
     std::string tempDllPath;
-    std::filesystem::file_time_type lastWriteTime;
-    static inline int tempDllCounter = 0;
+    std::filesystem::file_time_type lastDllWriteTime;
 
     // DLL management
     HMODULE scriptDLL = nullptr;

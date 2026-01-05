@@ -68,7 +68,7 @@ public:
         // FIRE BULLETS
         if (g_API->GetKeyDown(44) && timeSinceLastShot >= fireRate)  // SPACE = 44
         {
-            std::cout << "[TankScript] FIRE! Creating bulletYO SOY GIGANTEEEEEEEEEEEEEEEEEEEEE..." << std::endl;
+            std::cout << "[TankScript] FIRE! Creating bullet [aqui añadir cambios]" << std::endl;
 
             // Get tank position
             TransformHandle tankTransform = g_API->GetTransform(owner);
