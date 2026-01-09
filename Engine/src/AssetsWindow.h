@@ -106,6 +106,16 @@ private:
     bool AddScriptToFactory(const std::string& scriptName);
     bool AddScriptToDropdown(const std::string& scriptName);
 
+    // Folder creation
+    void CreateNewFolder(const std::string& folderName);
+
+    // Move assets 
+    bool MoveAssetToFolder(const std::string& assetPath, const std::string& targetFolderPath);
+    bool MoveDirectory(const std::string& sourcePath, const std::string& targetFolderPath);
+
+    // Open files with default editor 
+    bool OpenFileWithDefaultEditor(const std::string& filePath);
+
     std::string assetsRootPath;
     std::string currentPath;
     std::string sceneRootPath;
@@ -123,6 +133,10 @@ private:
     // Script creation dialog
     bool showCreateScriptDialog;
     char newScriptNameBuffer[128];
+
+    // Folder creation dialog 
+    bool showCreateFolderDialog;
+    char newFolderNameBuffer[128];
 
     // Para rastrear qué FBX están expandidos
     std::unordered_set<std::string> expandedFBXPaths;

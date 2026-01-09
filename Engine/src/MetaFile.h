@@ -14,7 +14,9 @@ enum class AssetType {
     TEXTURE_PNG = 2,
     TEXTURE_JPG = 3,
     TEXTURE_DDS = 4,
-    TEXTURE_TGA = 5
+    TEXTURE_TGA = 5,
+    SCRIPT_H = 6,
+    SCRIPT_CPP = 7
 };
 
 struct ImportSettings {
@@ -81,12 +83,19 @@ struct MetaFile {
 
     static std::string MakeRelativeToProject(const std::string& absolutePath);
     static std::string MakeAbsoluteFromProject(const std::string& relativePath);
+
+private:
+    // Helper para saber si es un script
+    bool IsScript() const {
+        return type == AssetType::SCRIPT_H || type == AssetType::SCRIPT_CPP;
+    }
 };
 
 class MetaFileManager {
 public:
     static void Initialize();
     static void ScanAssets();
+    static void ScanScripts();
     static void CleanOrphanedMetaFiles();
     static void CheckForChanges();
     static MetaFile GetOrCreateMeta(const std::string& assetPath);

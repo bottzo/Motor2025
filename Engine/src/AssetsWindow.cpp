@@ -21,11 +21,18 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
+#ifdef _WIN32
+#include <windows.h>
+#include <shellapi.h>
+#endif
+
 AssetsWindow::AssetsWindow()
     : EditorWindow("Assets"), selectedAsset(nullptr), iconSize(64.0f),
-    showInMemoryOnly(false), show3DPreviews(true), showDeleteConfirmation(false),showCreateScriptDialog(false)
+    showInMemoryOnly(false), show3DPreviews(true), showDeleteConfirmation(false),
+    showCreateScriptDialog(false), showCreateFolderDialog(false)
 {
-	memset(newScriptNameBuffer, 0, sizeof(newScriptNameBuffer)); // memset, set buffer to zero
+    memset(newScriptNameBuffer, 0, sizeof(newScriptNameBuffer));
+    memset(newFolderNameBuffer, 0, sizeof(newFolderNameBuffer));
 
     if (!LibraryManager::IsInitialized()) {
         LibraryManager::Initialize();
@@ -425,6 +432,100 @@ void AssetsWindow::Draw()
         ImGui::EndChild();
     }
 
+    // Create Script Dialog
+    if (showCreateScriptDialog)
+    {
+        ImGui::OpenPopup("Create New Script");
+    }
+
+    if (ImGui::BeginPopupModal("Create New Script", &showCreateScriptDialog, ImGuiWindowFlags_AlwaysAutoResize))
+    {
+        ImGui::TextColored(ImVec4(0.3f, 1.0f, 0.3f, 1.0f), "Create New Script Class");
+        ImGui::Spacing();
+        ImGui::TextWrapped("Creates .h and .cpp files in Scripting/ folder");
+        ImGui::TextWrapped("Inherits from ScriptBase (Start/Update/CleanUp)");
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        ImGui::Text("Script Class Name:");
+        ImGui::SetNextItemWidth(300);
+        ImGui::InputText("##ScriptName", newScriptNameBuffer, sizeof(newScriptNameBuffer));
+
+        ImGui::Spacing();
+        ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.2f, 1.0f), "After creating:");
+        ImGui::BulletText("Rebuild Scripting project");
+
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        if (ImGui::Button("Create Script", ImVec2(140, 0)))
+        {
+            std::string scriptName = std::string(newScriptNameBuffer);
+            if (!scriptName.empty())
+            {
+                CreateNewScript(scriptName);
+                showCreateScriptDialog = false;
+            }
+        }
+
+        ImGui::SameLine();
+
+        if (ImGui::Button("Cancel", ImVec2(140, 0)))
+        {
+            showCreateScriptDialog = false;
+        }
+
+        ImGui::EndPopup();
+    }
+
+    if (showCreateFolderDialog)
+    {
+        ImGui::OpenPopup("Create New Folder");
+    }
+
+    if (ImGui::BeginPopupModal("Create New Folder", &showCreateFolderDialog, ImGuiWindowFlags_AlwaysAutoResize))
+    {
+        ImGui::TextColored(ImVec4(0.3f, 1.0f, 0.3f, 1.0f), "Create New Folder");
+        ImGui::Spacing();
+        ImGui::TextWrapped("Creates a new folder in the current directory");
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        ImGui::Text("Folder Name:");
+        ImGui::SetNextItemWidth(300);
+        ImGui::InputText("##FolderName", newFolderNameBuffer, sizeof(newFolderNameBuffer));
+
+        ImGui::Spacing();
+        ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.2f, 1.0f), "Location:");
+        ImGui::Text("%s", currentPath.c_str());
+
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        if (ImGui::Button("Create Folder", ImVec2(140, 0)))
+        {
+            std::string folderName = std::string(newFolderNameBuffer);
+            if (!folderName.empty())
+            {
+                CreateNewFolder(folderName);
+                showCreateFolderDialog = false;
+            }
+        }
+
+        ImGui::SameLine();
+
+        if (ImGui::Button("Cancel", ImVec2(140, 0)))
+        {
+            showCreateFolderDialog = false;
+        }
+
+        ImGui::EndPopup();
+    }
+
     if (importSettingsWindow)
     {
         importSettingsWindow->Draw();
@@ -504,7 +605,7 @@ void AssetsWindow::DrawAssetsList()
     std::replace(scriptingStr.begin(), scriptingStr.end(), '\\', '/');
     bool isInScriptingFolder = (currentStr.find(scriptingStr) == 0);
 
-	if (currentPath != assetsRootPath && currentPath != sceneRootPath && !isInScriptingFolder) // Quit from scripting folder 
+    if (currentPath != assetsRootPath && currentPath != sceneRootPath && !isInScriptingFolder)
     {
         if (ImGui::Button("<- Back"))
         {
@@ -514,7 +615,7 @@ void AssetsWindow::DrawAssetsList()
         ImGui::SameLine();
     }
 
-	// Only in scripting folder
+    // Only in scripting folder
     if (isInScriptingFolder)
     {
         if (ImGui::Button("+ Create Script"))
@@ -529,54 +630,6 @@ void AssetsWindow::DrawAssetsList()
         {
             ComponentScript::BuildScriptingProject();
         }
-    }
-
-    // Create Script Dialog
-    if (showCreateScriptDialog)
-    {
-        ImGui::OpenPopup("Create New Script");
-    }
-
-    if (ImGui::BeginPopupModal("Create New Script", &showCreateScriptDialog, ImGuiWindowFlags_AlwaysAutoResize))
-    {
-        ImGui::TextColored(ImVec4(0.3f, 1.0f, 0.3f, 1.0f), "Create New Script Class");
-        ImGui::Spacing();
-        ImGui::TextWrapped("Creates .h and .cpp files in Scripting/ folder");
-        ImGui::TextWrapped("Inherits from ScriptBase (Start/Update/CleanUp)");
-        ImGui::Spacing();
-        ImGui::Separator();
-        ImGui::Spacing();
-
-        ImGui::Text("Script Class Name:");
-        ImGui::SetNextItemWidth(300);
-        ImGui::InputText("##ScriptName", newScriptNameBuffer, sizeof(newScriptNameBuffer));
-
-        ImGui::Spacing();
-        ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.2f, 1.0f), "After creating:");
-        ImGui::BulletText("Rebuild Scripting project");
-
-        ImGui::Spacing();
-        ImGui::Separator();
-        ImGui::Spacing();
-
-        if (ImGui::Button("Create Script", ImVec2(140, 0)))
-        {
-            std::string scriptName = std::string(newScriptNameBuffer);
-            if (!scriptName.empty())
-            {
-                CreateNewScript(scriptName);
-                showCreateScriptDialog = false;
-            }
-        }
-
-        ImGui::SameLine();
-
-        if (ImGui::Button("Cancel", ImVec2(140, 0)))
-        {
-            showCreateScriptDialog = false;
-        }
-
-        ImGui::EndPopup();
     }
 
     ImGui::Separator();
@@ -622,6 +675,20 @@ void AssetsWindow::DrawAssetsList()
     {
         currentPath = pathPendingToLoad;
         RefreshAssets();
+    }
+
+    if (ImGui::BeginPopupContextWindow("AssetsEmptySpaceMenu", ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems))
+    {
+        ImGui::TextColored(ImVec4(0.8f, 0.8f, 0.8f, 1.0f), "Create New");
+        ImGui::Separator();
+
+        if (ImGui::MenuItem("Folder"))
+        {
+            showCreateFolderDialog = true;
+            strcpy_s(newFolderNameBuffer, sizeof(newFolderNameBuffer), "NewFolder");
+        }
+
+        ImGui::EndPopup();
     }
 }
 
@@ -932,15 +999,19 @@ void AssetsWindow::DrawAssetItem(const AssetEntry& asset, std::string& pathPendi
 
     bool isButtonHovered = ImGui::IsItemHovered();
 
-    // Drag & Drop source 
-    if (!asset.isDirectory && ImGui::BeginDragDropSource(ImGuiDragDropFlags_None))
+    // Drag & Drop source - For moving and for using in hierarchy
+    if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None))
     {
         static DragDropPayload payload;
         payload.assetPath = asset.path;
         payload.assetUID = asset.uid;
 
-        // Determine the type of asset
-        if (asset.extension == ".png" || asset.extension == ".jpg" ||
+        if (asset.isDirectory)
+        {
+            payload.assetType = DragDropAssetType::UNKNOWN;
+            ImGui::Text("Folder: %s", asset.name.c_str());
+        }
+        else if (asset.extension == ".png" || asset.extension == ".jpg" ||
             asset.extension == ".jpeg" || asset.extension == ".dds" || asset.extension == ".tga")
         {
             payload.assetType = DragDropAssetType::TEXTURE;
@@ -961,6 +1032,34 @@ void AssetsWindow::DrawAssetItem(const AssetEntry& asset, std::string& pathPendi
         ImGui::EndDragDropSource();
     }
 
+    if (asset.isDirectory && ImGui::BeginDragDropTarget())
+    {
+        if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_ITEM"))
+        {
+            DragDropPayload* data = (DragDropPayload*)payload->Data;
+
+            // Move the asset to this folder
+            fs::path sourcePath(data->assetPath);
+            bool isSourceDirectory = fs::is_directory(sourcePath);
+
+            bool success = false;
+            if (isSourceDirectory)
+            {
+                success = MoveDirectory(data->assetPath, asset.path);
+            }
+            else
+            {
+                success = MoveAssetToFolder(data->assetPath, asset.path);
+            }
+
+            if (success)
+            {
+                RefreshAssets();
+            }
+        }
+        ImGui::EndDragDropTarget();
+    }
+
     if (clicked)
     {
         if (asset.isDirectory)
@@ -978,6 +1077,12 @@ void AssetsWindow::DrawAssetItem(const AssetEntry& asset, std::string& pathPendi
         if (asset.isDirectory)
         {
             pathPendingToLoad = asset.path;
+        }
+        else if (asset.extension == ".h" || asset.extension == ".cpp")
+        {
+            // Abrir archivo con Visual Studio 2022 (o editor predeterminado)
+            LOG_CONSOLE("[AssetsWindow] Opening script file: %s", asset.path.c_str());
+            OpenFileWithDefaultEditor(asset.path);
         }
     }
 
@@ -1008,6 +1113,15 @@ void AssetsWindow::DrawAssetItem(const AssetEntry& asset, std::string& pathPendi
     {
         ImGui::TextColored(ImVec4(0.8f, 0.8f, 0.8f, 1.0f), "%s", asset.name.c_str());
         ImGui::Separator();
+
+        if (!asset.isDirectory && (asset.extension == ".h" || asset.extension == ".cpp"))
+        {
+            if (ImGui::MenuItem("Open with Visual Studio"))
+            {
+                OpenFileWithDefaultEditor(asset.path);
+            }
+            ImGui::Separator();
+        }
 
         if (!asset.isDirectory &&
             (asset.extension == ".fbx" ||
@@ -1059,15 +1173,20 @@ void AssetsWindow::DrawAssetItem(const AssetEntry& asset, std::string& pathPendi
         if (!asset.isDirectory && asset.uid != 0) {
             ImGui::Text("UID: %llu", asset.uid);
         }
-        if (asset.isDirectory && asset.inMemory) {
-            ImGui::TextColored(ImVec4(0.3f, 1.0f, 0.3f, 1.0f), "Contains %d loaded refs", asset.references);
+        if (asset.isDirectory) {
+            ImGui::TextColored(ImVec4(0.5f, 0.8f, 1.0f, 1.0f), "Drop files here to move");
+            if (asset.inMemory) {
+                ImGui::TextColored(ImVec4(0.3f, 1.0f, 0.3f, 1.0f), "Contains %d loaded refs", asset.references);
+            }
+        }
+        if (!asset.isDirectory && (asset.extension == ".h" || asset.extension == ".cpp")) {
+            ImGui::TextColored(ImVec4(0.5f, 0.8f, 1.0f, 1.0f), "Double-click to open in VS 2022");
         }
         ImGui::EndTooltip();
     }
 
     ImGui::PopID();
 }
-
 void AssetsWindow::LoadFBXSubMeshes(AssetEntry& fbxAsset)
 {
     fbxAsset.subMeshes.clear();
@@ -1310,7 +1429,10 @@ void AssetsWindow::ScanDirectory(const fs::path& directory, std::vector<AssetEnt
 
         bool isDirectory = entry.is_directory();
 
-        if (!isDirectory && !IsAssetFile(extension))
+        bool isScriptFile = (extension == ".h" || extension == ".cpp");
+        bool isInScriptingFolder = (directory.string().find("Scripting") != std::string::npos);
+
+        if (!isDirectory && !IsAssetFile(extension) && !(isScriptFile && isInScriptingFolder))
         {
             continue;
         }
@@ -1359,7 +1481,6 @@ void AssetsWindow::ScanDirectory(const fs::path& directory, std::vector<AssetEnt
                                 {
                                     if (subExt == ".fbx")
                                     {
-                                        // For FBX, verify all meshes with sequential UIDs
                                         const auto& allResources = resources->GetAllResources();
 
                                         for (int i = 0; i < 100; i++) {
@@ -1370,7 +1491,6 @@ void AssetsWindow::ScanDirectory(const fs::path& directory, std::vector<AssetEnt
                                                 break;
                                             }
 
-                                            // Check if it is loaded in memory
                                             for (const auto& pair : allResources)
                                             {
                                                 if (pair.second->GetLibraryFile() == meshLibPath)
@@ -1396,7 +1516,6 @@ void AssetsWindow::ScanDirectory(const fs::path& directory, std::vector<AssetEnt
                                     }
                                     else
                                     {
-                                        // For other types of assets
                                         if (resources->IsResourceLoaded(subMeta.uid))
                                         {
                                             anyLoaded = true;
@@ -1433,7 +1552,6 @@ void AssetsWindow::ScanDirectory(const fs::path& directory, std::vector<AssetEnt
 
                         const auto& allResources = resources->GetAllResources();
 
-                        // Verify all meshes in the FBX (sequential UIDs)
                         for (int i = 0; i < 100; i++) {
                             unsigned long long meshUID = meta.uid + i;
                             std::string meshLibPath = LibraryManager::GetMeshPathFromUID(meshUID);
@@ -1442,7 +1560,6 @@ void AssetsWindow::ScanDirectory(const fs::path& directory, std::vector<AssetEnt
                                 break;
                             }
 
-                            // Check if it is loaded in memory
                             for (const auto& pair : allResources)
                             {
                                 if (pair.second->GetLibraryFile() == meshLibPath)
@@ -1467,6 +1584,11 @@ void AssetsWindow::ScanDirectory(const fs::path& directory, std::vector<AssetEnt
                         asset.inMemory = resources->IsResourceLoaded(asset.uid);
                         asset.references = resources->GetResourceReferenceCount(asset.uid);
                     }
+                    else if (extension == ".h" || extension == ".cpp")
+                    {
+                        asset.inMemory = false;
+                        asset.references = 0;
+                    }
                     else
                     {
                         asset.inMemory = resources->IsResourceLoaded(asset.uid);
@@ -1486,7 +1608,6 @@ void AssetsWindow::ScanDirectory(const fs::path& directory, std::vector<AssetEnt
             return a.name < b.name;
         });
 }
-
 const char* AssetsWindow::GetAssetIcon(const std::string& extension) const
 {
     if (extension.empty()) return "[DIR]";
@@ -2775,4 +2896,241 @@ bool AssetsWindow::AddScriptToDropdown(const std::string& scriptName)
 
     LOG_CONSOLE("Added to ComponentScript dropdown");
     return true;
+}
+
+bool AssetsWindow::OpenFileWithDefaultEditor(const std::string& filePath)
+{
+    if (!fs::exists(filePath))
+    {
+        LOG_CONSOLE("[AssetsWindow] ERROR: File does not exist: %s", filePath.c_str());
+        return false;
+    }
+
+#ifdef _WIN32
+    // Convert to wide string for Unicode support
+    std::wstring wideFilePath(filePath.begin(), filePath.end());
+
+    // Try Visual Studio 2022 first
+    std::vector<std::wstring> vsPaths = {
+        L"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\Common7\\IDE\\devenv.exe",
+        L"C:\\Program Files\\Microsoft Visual Studio\\2022\\Professional\\Common7\\IDE\\devenv.exe",
+        L"C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\Common7\\IDE\\devenv.exe"
+    };
+
+    for (const auto& vsPath : vsPaths)
+    {
+        if (fs::exists(vsPath))
+        {
+            // Found Visual Studio 2022, use it
+            // Use /Edit flag to open in existing instance instead of creating new window
+            std::wstring command = L"\"" + vsPath + L"\" /Edit \"" + wideFilePath + L"\"";
+
+            STARTUPINFOW si = { sizeof(si) };
+            PROCESS_INFORMATION pi;
+
+            if (CreateProcessW(
+                NULL,
+                const_cast<LPWSTR>(command.c_str()),
+                NULL,
+                NULL,
+                FALSE,
+                0,
+                NULL,
+                NULL,
+                &si,
+                &pi))
+            {
+                CloseHandle(pi.hProcess);
+                CloseHandle(pi.hThread);
+
+                LOG_CONSOLE("[AssetsWindow] Opened file with Visual Studio 2022: %s", filePath.c_str());
+                return true;
+            }
+        }
+    }
+
+    // Fallback: Use default editor if Visual Studio 2022 is not found
+    LOG_CONSOLE("[AssetsWindow] Visual Studio 2022 not found, using default editor");
+
+    HINSTANCE result = ShellExecuteW(
+        NULL,           // Parent window
+        L"open",        // Operation
+        wideFilePath.c_str(),  // File to open
+        NULL,           // Parameters
+        NULL,           // Working directory
+        SW_SHOW         // Show command
+    );
+
+    // ShellExecute returns > 32 on success
+    if ((INT_PTR)result > 32)
+    {
+        LOG_CONSOLE("[AssetsWindow] Opened file with default editor: %s", filePath.c_str());
+        return true;
+    }
+    else
+    {
+        LOG_CONSOLE("[AssetsWindow] ERROR: Failed to open file (code: %d)", (int)(INT_PTR)result);
+        return false;
+    }
+#else
+    LOG_CONSOLE("[AssetsWindow] ERROR: OpenFileWithDefaultEditor only supported on Windows");
+    return false;
+#endif
+}
+
+void AssetsWindow::CreateNewFolder(const std::string& folderName)
+{
+    if (folderName.empty())
+    {
+        LOG_CONSOLE("[AssetsWindow] ERROR: Folder name cannot be empty!");
+        return;
+    }
+
+    // Check for invalid characters
+    if (folderName.find_first_of("/\\:*?\"<>|") != std::string::npos)
+    {
+        LOG_CONSOLE("[AssetsWindow] ERROR: Folder name contains invalid characters!");
+        return;
+    }
+
+    fs::path newFolderPath = fs::path(currentPath) / folderName;
+
+    if (fs::exists(newFolderPath))
+    {
+        LOG_CONSOLE("[AssetsWindow] ERROR: Folder already exists: %s", folderName.c_str());
+        return;
+    }
+
+    try
+    {
+        fs::create_directory(newFolderPath);
+        LOG_CONSOLE("[AssetsWindow] Created folder: %s", newFolderPath.string().c_str());
+        RefreshAssets();
+    }
+    catch (const fs::filesystem_error& e)
+    {
+        LOG_CONSOLE("[AssetsWindow] ERROR creating folder: %s", e.what());
+    }
+}
+
+bool AssetsWindow::MoveAssetToFolder(const std::string& assetPath, const std::string& targetFolderPath)
+{
+    if (!fs::exists(assetPath))
+    {
+        LOG_CONSOLE("[AssetsWindow] ERROR: Source asset does not exist: %s", assetPath.c_str());
+        return false;
+    }
+
+    if (!fs::exists(targetFolderPath) || !fs::is_directory(targetFolderPath))
+    {
+        LOG_CONSOLE("[AssetsWindow] ERROR: Target folder does not exist: %s", targetFolderPath.c_str());
+        return false;
+    }
+
+    fs::path sourcePath(assetPath);
+    fs::path targetPath = fs::path(targetFolderPath) / sourcePath.filename();
+
+    if (sourcePath.parent_path() == targetFolderPath)
+    {
+        LOG_CONSOLE("[AssetsWindow] Asset is already in target folder");
+        return false;
+    }
+
+    if (fs::exists(targetPath))
+    {
+        LOG_CONSOLE("[AssetsWindow] ERROR: Asset with same name already exists in target folder");
+        return false;
+    }
+
+    try
+    {
+        // Move the asset file
+        fs::rename(sourcePath, targetPath);
+
+        // Move the .meta file if it exists
+        std::string metaSource = assetPath + ".meta";
+        if (fs::exists(metaSource))
+        {
+            std::string metaTarget = targetPath.string() + ".meta";
+            fs::rename(metaSource, metaTarget);
+
+            std::string extension = sourcePath.extension().string();
+            if (extension == ".h" || extension == ".cpp")
+            {
+                MetaFile meta = MetaFile::Load(metaTarget);
+                meta.originalPath = targetPath.string();
+                meta.Save(metaTarget);
+            }
+        }
+
+        LOG_CONSOLE("[AssetsWindow] Moved asset: %s -> %s", assetPath.c_str(), targetPath.string().c_str());
+        return true;
+    }
+    catch (const fs::filesystem_error& e)
+    {
+        LOG_CONSOLE("[AssetsWindow] ERROR moving asset: %s", e.what());
+        return false;
+    }
+}
+
+bool AssetsWindow::MoveDirectory(const std::string& sourcePath, const std::string& targetFolderPath)
+{
+    if (!fs::exists(sourcePath) || !fs::is_directory(sourcePath))
+    {
+        LOG_CONSOLE("[AssetsWindow] ERROR: Source directory does not exist: %s", sourcePath.c_str());
+        return false;
+    }
+
+    if (!fs::exists(targetFolderPath) || !fs::is_directory(targetFolderPath))
+    {
+        LOG_CONSOLE("[AssetsWindow] ERROR: Target folder does not exist: %s", targetFolderPath.c_str());
+        return false;
+    }
+
+    fs::path source(sourcePath);
+    fs::path targetPath = fs::path(targetFolderPath) / source.filename();
+
+    // Check if trying to move to itself
+    if (source == targetFolderPath)
+    {
+        LOG_CONSOLE("[AssetsWindow] ERROR: Cannot move folder into itself");
+        return false;
+    }
+
+    // Check if already in the same location
+    if (source.parent_path() == targetFolderPath)
+    {
+        LOG_CONSOLE("[AssetsWindow] Folder is already in target location");
+        return false;
+    }
+
+    // Check if target would be inside source (prevent recursive move)
+    std::string targetStr = targetFolderPath;
+    std::string sourceStr = sourcePath;
+    if (targetStr.find(sourceStr) == 0)
+    {
+        LOG_CONSOLE("[AssetsWindow] ERROR: Cannot move folder into its own subfolder");
+        return false;
+    }
+
+    // Check if target already exists
+    if (fs::exists(targetPath))
+    {
+        LOG_CONSOLE("[AssetsWindow] ERROR: Folder with same name already exists in target location");
+        return false;
+    }
+
+    try
+    {
+        // Move the entire directory
+        fs::rename(source, targetPath);
+
+        LOG_CONSOLE("[AssetsWindow] Moved folder: %s -> %s", sourcePath.c_str(), targetPath.string().c_str());
+        return true;
+    }
+    catch (const fs::filesystem_error& e)
+    {
+        LOG_CONSOLE("[AssetsWindow] ERROR moving folder: %s", e.what());
+        return false;
+    }
 }

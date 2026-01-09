@@ -7,6 +7,7 @@
 #include <fstream>
 #include <thread>
 #include <chrono>
+#include "LibraryManager.h"
 
 ComponentScript::ComponentScript(GameObject* owner)
     : Component(owner, ComponentType::SCRIPT)
@@ -361,7 +362,7 @@ void ComponentScript::OnEditor()
     {
         ImGui::TextColored(ImVec4(1.0f, 0.3f, 0.3f, 1.0f), "No Script Loaded");
 
-		// Refresh available scripts 
+        // Refresh available scripts 
         static std::vector<std::string> availableScripts;
         static int selectedScriptIndex = 0;
 
@@ -505,7 +506,7 @@ std::vector<std::string> ComponentScript::GetScriptClassesInDLL(const std::strin
     {
         classes.push_back("TestingScript");
 
-		// Dont delete this comment - it's a placeholder
+        // Dont delete this comment - it's a placeholder
         // ADD MORE SCRIPTS HERE AS YOU CREATE THEM
     }
     // Add more DLLs here as needed
@@ -520,11 +521,9 @@ bool ComponentScript::BuildScriptingProject()
     LOG_CONSOLE("========================================");
 
     // Using CMake with clean-first to force rebuild
-    // CMake automatically detects all .h/.cpp files in Scripting folder
-    std::string command = "cd \"C:\\Users\\haosh\\Documents\\GitHub\\Motor2025\\Engine\\build\" && " 
-                          "cmake --build . --config Debug --target Scripting --clean-first";
+    std::string command = "cd \"C:\\Users\\haosh\\Documents\\GitHub\\Motor2025\\Engine\\build\" && "
+        "cmake --build . --config Debug --target Scripting --clean-first";
 
-    // Execute command 
     STARTUPINFOA si = { sizeof(si) };
     PROCESS_INFORMATION pi;
     si.dwFlags = STARTF_USESHOWWINDOW;
@@ -534,8 +533,7 @@ bool ComponentScript::BuildScriptingProject()
     {
         LOG_CONSOLE("Build started... (this may take a few seconds)");
 
-        // Wait for process to complete 
-        DWORD result = WaitForSingleObject(pi.hProcess, 30000); // 30 second timeout
+        DWORD result = WaitForSingleObject(pi.hProcess, 30000);
 
         if (result == WAIT_OBJECT_0)
         {
@@ -550,6 +548,9 @@ bool ComponentScript::BuildScriptingProject()
                 LOG_CONSOLE("========================================");
                 LOG_CONSOLE("Build SUCCESS!");
                 LOG_CONSOLE("========================================");
+
+                ImportBuiltScriptsToLibrary();
+
                 return true;
             }
             else
@@ -576,3 +577,33 @@ bool ComponentScript::BuildScriptingProject()
     }
 }
 
+void ComponentScript::ImportBuiltScriptsToLibrary()
+{
+    LOG_CONSOLE("[ComponentScript] Importing built scripts to Library...");
+
+    std::string scriptingSrc = LibraryManager::GetScriptingRoot() + "/src";
+    std::string dllPath = "x64/Debug/Scripting.dll";
+
+    if (!std::filesystem::exists(dllPath)) {
+        LOG_CONSOLE("[ComponentScript] WARNING: Built DLL not found at: %s", dllPath.c_str());
+        return;
+    }
+
+    int imported = 0;
+
+    // Scan all .h files in Scripting/src
+    for (const auto& entry : std::filesystem::directory_iterator(scriptingSrc)) {
+        if (!entry.is_regular_file()) continue;
+
+        std::string extension = entry.path().extension().string();
+        if (extension != ".h") continue;
+
+        std::string headerPath = entry.path().string();
+
+        if (LibraryManager::ImportScriptToLibrary(headerPath, dllPath)) {
+            imported++;
+        }
+    }
+
+    LOG_CONSOLE("[ComponentScript] Imported %d scripts to Library", imported);
+}

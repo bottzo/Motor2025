@@ -44,6 +44,8 @@ public:
     // Build system
     static bool BuildScriptingProject();
 
+    static void ImportBuiltScriptsToLibrary();
+
 private:
     bool CheckForDllChange();
     void CleanupTempDLL();

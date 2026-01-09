@@ -16,6 +16,7 @@ namespace fs = std::filesystem;
 
 bool LibraryManager::s_initialized = false;
 fs::path LibraryManager::s_projectRoot;
+fs::path LibraryManager::s_scriptingRoot;
 
 // Function to rotate vertices according to axis configuration
 void ApplyAxisConversion(Mesh& mesh, int upAxis, int frontAxis) {
@@ -64,15 +65,11 @@ void LibraryManager::Initialize() {
 
     namespace fs = std::filesystem;
 
-    // Obtener ejecutable
     char buffer[MAX_PATH];
     GetModuleFileNameA(NULL, buffer, MAX_PATH);
     fs::path execPath(buffer);
-
-    // Directorio del ejecutable
     fs::path currentSearchPath = execPath.parent_path();
 
-    // Buscar Assets subiendo niveles
     bool assetsFound = false;
     int maxLevels = 5;
 
@@ -86,10 +83,8 @@ void LibraryManager::Initialize() {
             break;
         }
 
-        // Subir un nivel
         currentSearchPath = currentSearchPath.parent_path();
 
-        // Verificar si llegamos a la raíz
         if (currentSearchPath == currentSearchPath.parent_path()) {
             break;
         }
@@ -100,6 +95,16 @@ void LibraryManager::Initialize() {
         return;
     }
 
+    s_scriptingRoot = s_projectRoot / "Scripting";
+    if (!fs::exists(s_scriptingRoot)) {
+        LOG_CONSOLE("[LibraryManager] WARNING: Scripting folder not found, creating it...");
+        EnsureDirectoryExists(s_scriptingRoot);
+        EnsureDirectoryExists(s_scriptingRoot / "src");
+    }
+    else {
+        LOG_CONSOLE("[LibraryManager] Scripting folder found at: %s", s_scriptingRoot.string().c_str());
+    }
+
     fs::path libraryRoot = s_projectRoot / "Library";
     EnsureDirectoryExists(libraryRoot);
 
@@ -108,11 +113,105 @@ void LibraryManager::Initialize() {
     EnsureDirectoryExists(libraryRoot / "Textures");
     EnsureDirectoryExists(libraryRoot / "Models");
     EnsureDirectoryExists(libraryRoot / "Animations");
-    EnsureDirectoryExists(libraryRoot / "Scripts");      
+    EnsureDirectoryExists(libraryRoot / "Scripts");
     EnsureDirectoryExists(libraryRoot / "TempScene");
 
     s_initialized = true;
     LOG_CONSOLE("[LibraryManager] Library initialized successfully");
+}
+
+std::string LibraryManager::GetScriptingRoot() {
+    return s_scriptingRoot.string();
+}
+
+std::string LibraryManager::GetScriptPathFromClassName(const std::string& className) {
+    fs::path scriptingSrc = s_scriptingRoot / "src";
+
+    if (!fs::exists(scriptingSrc)) {
+        return "";
+    }
+
+    for (const auto& entry : fs::directory_iterator(scriptingSrc)) {
+        if (!entry.is_regular_file()) continue;
+
+        std::string filename = entry.path().stem().string();
+        std::string extension = entry.path().extension().string();
+
+        // Look for .h file matching class name
+        if (extension == ".h" && filename == className) {
+            std::string metaPath = entry.path().string() + ".meta";
+
+            if (fs::exists(metaPath)) {
+                MetaFile meta = MetaFile::Load(metaPath);
+                if (meta.uid != 0) {
+                    return GetScriptPathFromUID(meta.uid);
+                }
+            }
+        }
+    }
+
+    return "";
+}
+
+bool LibraryManager::ImportScriptToLibrary(const std::string& headerPath, const std::string& dllPath) {
+    if (!fs::exists(headerPath)) {
+        LOG_CONSOLE("[LibraryManager] ERROR: Header file not found: %s", headerPath.c_str());
+        return false;
+    }
+
+    if (!fs::exists(dllPath)) {
+        LOG_CONSOLE("[LibraryManager] ERROR: DLL file not found: %s", dllPath.c_str());
+        return false;
+    }
+
+    // Get or create .meta for the header
+    std::string metaPath = headerPath + ".meta";
+    MetaFile meta;
+
+    if (fs::exists(metaPath)) {
+        meta = MetaFile::Load(metaPath);
+    }
+    else {
+        meta.uid = MetaFile::GenerateUID();
+        meta.type = AssetType::SCRIPT_H;
+        meta.originalPath = headerPath;
+        meta.lastModified = MetaFileManager::GetFileTimestamp(headerPath);
+        meta.Save(metaPath);
+    }
+
+    if (meta.uid == 0) {
+        LOG_CONSOLE("[LibraryManager] ERROR: Invalid UID for script");
+        return false;
+    }
+
+    // Copy DLL to Library/Scripts/{UID}.script
+    std::string scriptLibraryPath = GetScriptPathFromUID(meta.uid);
+
+    // NUEVO: Asegurar que el directorio existe
+    fs::path scriptsDir = fs::path(scriptLibraryPath).parent_path();
+    if (!fs::exists(scriptsDir)) {
+        try {
+            fs::create_directories(scriptsDir);
+            LOG_CONSOLE("[LibraryManager] Created Scripts directory");
+        }
+        catch (const fs::filesystem_error& e) {
+            LOG_CONSOLE("[LibraryManager] ERROR creating Scripts directory: %s", e.what());
+            return false;
+        }
+    }
+
+    try {
+        fs::copy_file(dllPath, scriptLibraryPath, fs::copy_options::overwrite_existing);
+        LOG_CONSOLE("[LibraryManager] Script imported: %s -> %s (UID: %llu)",
+            fs::path(headerPath).filename().string().c_str(),
+            scriptLibraryPath.c_str(),
+            meta.uid);
+        return true;
+    }
+    catch (const fs::filesystem_error& e) {
+        LOG_CONSOLE("[LibraryManager] ERROR copying DLL: %s", e.what());
+        return false;
+    }
 }
 
 void LibraryManager::EnsureDirectoryExists(const fs::path& path) {
@@ -166,7 +265,7 @@ std::string LibraryManager::GetAnimationPathFromUID(unsigned long long uid) {
 }
 
 std::string LibraryManager::GetScriptPathFromUID(unsigned long long uid) {
-    std::string filename = std::to_string(uid) + ".dll";
+    std::string filename = std::to_string(uid) + ".script";
     return (s_projectRoot / "Library" / "Scripts" / filename).string();
 }
 

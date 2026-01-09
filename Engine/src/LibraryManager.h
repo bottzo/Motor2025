@@ -17,7 +17,7 @@ public:
     static std::string GetTexturePathFromUID(unsigned long long uid);
     static std::string GetModelPathFromUID(unsigned long long uid);
     static std::string GetAnimationPathFromUID(unsigned long long uid);
-    static std::string GetScriptPathFromUID(unsigned long long uid);  
+    static std::string GetScriptPathFromUID(unsigned long long uid);
 
     // Legacy compatibility
     static std::string GetMeshPath(const std::string& filename);
@@ -29,6 +29,7 @@ public:
     // Base paths
     static std::string GetLibraryRoot();
     static std::string GetAssetsRoot();
+    static std::string GetScriptingRoot();  
 
     // Library management
     static void ClearLibrary();
@@ -36,7 +37,11 @@ public:
 
     static bool ReimportAsset(const std::string& assetPath);
 
+    static std::string GetScriptPathFromClassName(const std::string& className);
+    static bool ImportScriptToLibrary(const std::string& headerPath, const std::string& dllPath);
+
 private:
     static bool s_initialized;
     static fs::path s_projectRoot;
+    static fs::path s_scriptingRoot;  
 };
