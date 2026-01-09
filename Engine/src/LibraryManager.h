@@ -17,6 +17,7 @@ public:
     static std::string GetTexturePathFromUID(unsigned long long uid);
     static std::string GetModelPathFromUID(unsigned long long uid);
     static std::string GetAnimationPathFromUID(unsigned long long uid);
+    static std::string GetScriptPathFromUID(unsigned long long uid);  
 
     // Legacy compatibility
     static std::string GetMeshPath(const std::string& filename);

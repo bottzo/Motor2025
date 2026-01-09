@@ -108,6 +108,7 @@ void LibraryManager::Initialize() {
     EnsureDirectoryExists(libraryRoot / "Textures");
     EnsureDirectoryExists(libraryRoot / "Models");
     EnsureDirectoryExists(libraryRoot / "Animations");
+    EnsureDirectoryExists(libraryRoot / "Scripts");      
     EnsureDirectoryExists(libraryRoot / "TempScene");
 
     s_initialized = true;
@@ -162,6 +163,11 @@ std::string LibraryManager::GetModelPathFromUID(unsigned long long uid) {
 std::string LibraryManager::GetAnimationPathFromUID(unsigned long long uid) {
     std::string filename = std::to_string(uid) + ".anim";
     return (s_projectRoot / "Library" / "Animations" / filename).string();
+}
+
+std::string LibraryManager::GetScriptPathFromUID(unsigned long long uid) {
+    std::string filename = std::to_string(uid) + ".dll";
+    return (s_projectRoot / "Library" / "Scripts" / filename).string();
 }
 
 std::string LibraryManager::GetMeshPath(const std::string& filename) {
@@ -366,6 +372,7 @@ bool LibraryManager::ReimportAsset(const std::string& assetPath) {
 
     return success;
 }
+
 void LibraryManager::RegenerateFromAssets() {
     LOG_CONSOLE("[LibraryManager] Scanning Assets and checking for changes...");
 
@@ -525,4 +532,3 @@ void LibraryManager::RegenerateFromAssets() {
     LOG_CONSOLE("[LibraryManager] Scan complete: %d re-imported/new, %d synchronized, %d errors",
         processed, skipped, errors);
 }
-
