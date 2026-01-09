@@ -12,18 +12,21 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include "ImportSettingsWindow.h"
-#include "TextureImporter.h" 
-#include "FileSystem.h"       
-#include "GameObject.h"        
-#include "Input.h"           
+#include "TextureImporter.h"
+#include "FileSystem.h"
+#include "GameObject.h"
+#include "Input.h"
+#include "ComponentScript.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
 AssetsWindow::AssetsWindow()
     : EditorWindow("Assets"), selectedAsset(nullptr), iconSize(64.0f),
-    showInMemoryOnly(false), show3DPreviews(true), showDeleteConfirmation(false)
+    showInMemoryOnly(false), show3DPreviews(true), showDeleteConfirmation(false),showCreateScriptDialog(false)
 {
+	memset(newScriptNameBuffer, 0, sizeof(newScriptNameBuffer)); // memset, set buffer to zero
+
     if (!LibraryManager::IsInitialized()) {
         LibraryManager::Initialize();
     }
@@ -32,6 +35,7 @@ AssetsWindow::AssetsWindow()
     currentPath = assetsRootPath;
 
     sceneRootPath = fs::path(assetsRootPath).parent_path().string() + "/Scene";
+    scriptingRootPath = fs::path(assetsRootPath).parent_path().string() + "/Scripting/src";
     importSettingsWindow = new ImportSettingsWindow();
 }
 
@@ -411,6 +415,7 @@ void AssetsWindow::Draw()
         ImGui::BeginChild("FolderTree", ImVec2(200, 0), true);
         DrawFolderTree(assetsRootPath, "Assets");
         DrawFolderTree(sceneRootPath, "Scene");
+        DrawFolderTree(scriptingRootPath, "Scripting");
         ImGui::EndChild();
 
         ImGui::SameLine();
@@ -489,15 +494,92 @@ void AssetsWindow::DrawFolderTree(const fs::path& path, const std::string& label
 
 void AssetsWindow::DrawAssetsList()
 {
-    if (currentPath != assetsRootPath && currentPath != sceneRootPath)
+    // In scripting folder?
+    fs::path currentPathNormalized = fs::path(currentPath).lexically_normal();
+    std::string scriptingBasePath = fs::path(assetsRootPath).parent_path().string() + "/Scripting";
+    fs::path scriptingBaseNormalized = fs::path(scriptingBasePath).lexically_normal();
+    std::string currentStr = currentPathNormalized.string();
+    std::string scriptingStr = scriptingBaseNormalized.string();
+    std::replace(currentStr.begin(), currentStr.end(), '\\', '/');
+    std::replace(scriptingStr.begin(), scriptingStr.end(), '\\', '/');
+    bool isInScriptingFolder = (currentStr.find(scriptingStr) == 0);
+
+	if (currentPath != assetsRootPath && currentPath != sceneRootPath && !isInScriptingFolder) // Quit from scripting folder 
     {
         if (ImGui::Button("<- Back"))
         {
             currentPath = fs::path(currentPath).parent_path().string();
             RefreshAssets();
         }
-        ImGui::Separator();
+        ImGui::SameLine();
     }
+
+	// Only in scripting folder
+    if (isInScriptingFolder)
+    {
+        if (ImGui::Button("+ Create Script"))
+        {
+            showCreateScriptDialog = true;
+            strcpy_s(newScriptNameBuffer, sizeof(newScriptNameBuffer), "NewScript");
+        }
+
+        ImGui::SameLine();
+
+        if (ImGui::Button("Rebuild Scripts"))
+        {
+            ComponentScript::BuildScriptingProject();
+        }
+    }
+
+    // Create Script Dialog
+    if (showCreateScriptDialog)
+    {
+        ImGui::OpenPopup("Create New Script");
+    }
+
+    if (ImGui::BeginPopupModal("Create New Script", &showCreateScriptDialog, ImGuiWindowFlags_AlwaysAutoResize))
+    {
+        ImGui::TextColored(ImVec4(0.3f, 1.0f, 0.3f, 1.0f), "Create New Script Class");
+        ImGui::Spacing();
+        ImGui::TextWrapped("Creates .h and .cpp files in Scripting/ folder");
+        ImGui::TextWrapped("Inherits from ScriptBase (Start/Update/CleanUp)");
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        ImGui::Text("Script Class Name:");
+        ImGui::SetNextItemWidth(300);
+        ImGui::InputText("##ScriptName", newScriptNameBuffer, sizeof(newScriptNameBuffer));
+
+        ImGui::Spacing();
+        ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.2f, 1.0f), "After creating:");
+        ImGui::BulletText("Rebuild Scripting project");
+
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        if (ImGui::Button("Create Script", ImVec2(140, 0)))
+        {
+            std::string scriptName = std::string(newScriptNameBuffer);
+            if (!scriptName.empty())
+            {
+                CreateNewScript(scriptName);
+                showCreateScriptDialog = false;
+            }
+        }
+
+        ImGui::SameLine();
+
+        if (ImGui::Button("Cancel", ImVec2(140, 0)))
+        {
+            showCreateScriptDialog = false;
+        }
+
+        ImGui::EndPopup();
+    }
+
+    ImGui::Separator();
 
     float windowWidth = ImGui::GetContentRegionAvail().x;
     int columns = (int)(windowWidth / (iconSize + 10.0f));
@@ -1413,6 +1495,7 @@ const char* AssetsWindow::GetAssetIcon(const std::string& extension) const
     if (extension == ".mesh") return "[MSH]";
     if (extension == ".texture") return "[TEX]";
     if (extension == ".wav" || extension == ".ogg" || extension == ".mp3") return "[SND]";
+    if (extension == ".h" || extension == ".cpp") return "[SCR]";
     return "[FILE]";
 }
 
@@ -1429,7 +1512,9 @@ bool AssetsWindow::IsAssetFile(const std::string& extension) const
         extension == ".texture" ||
         extension == ".wav" ||
         extension == ".ogg" ||
-        extension == ".json";
+        extension == ".json" ||
+        extension == ".h" ||
+        extension == ".cpp";
 }
 
 void AssetsWindow::LoadPreviewForAsset(AssetEntry& asset)
@@ -2369,5 +2454,325 @@ bool AssetsWindow::TestImportSystem()
         return false;
     }
 
+    return true;
+}
+// ==================== SCRIPT CREATION ====================
+
+std::string AssetsWindow::GenerateScriptHeader(const std::string& className)
+{
+    std::string header = R"(#pragma once
+#include "ScriptBase.h"
+
+class )" + className + R"( : public ScriptBase
+{
+public:
+
+    )" + className + R"((GameObjectHandle owner);
+
+    void Start() override;
+    void Update(float deltaTime) override;
+    void CleanUp() override;
+};
+)";
+    return header;
+}
+
+std::string AssetsWindow::GenerateScriptImplementation(const std::string& className)
+{
+    std::string implementation = R"(#include "pch.h"
+#include ")" + className + R"(.h"
+#include <iostream>
+
+)" + className + R"(::)" + className + R"((GameObjectHandle owner) : ScriptBase(owner)
+{
+    std::cout << "[)" + className + R"(] Instance created" << std::endl;
+}
+
+void )" + className + R"(::Start()
+{
+    std::cout << "[)" + className + R"(] Start called!" << std::endl;
+
+}
+
+void )" + className + R"(::Update(float deltaTime)
+{
+    if (!g_API) return;
+
+}
+
+void )" + className + R"(::CleanUp()
+{
+    std::cout << "[)" + className + R"(] Cleanup called" << std::endl;
+
+}
+)";
+    return implementation;
+}
+
+void AssetsWindow::CreateNewScript(const std::string& scriptName)
+{
+    if (scriptName.empty())
+    {
+        LOG_CONSOLE("[AssetsWindow] ERROR: Script name cannot be empty!");
+        return;
+    }
+
+    // Get Scripting/src folder
+    fs::path scriptsFolder = fs::path(assetsRootPath).parent_path() / "Scripting" / "src";
+
+    if (!fs::exists(scriptsFolder))
+    {
+        LOG_CONSOLE("[AssetsWindow] ERROR: Scripting/src folder not found: %s", scriptsFolder.string().c_str());
+        return;
+    }
+
+    // Generate file paths
+    std::string headerFileName = scriptName + ".h";
+    std::string cppFileName = scriptName + ".cpp";
+    fs::path headerPath = scriptsFolder / headerFileName;
+    fs::path cppPath = scriptsFolder / cppFileName;
+
+    // Check if files already exist
+    if (fs::exists(headerPath) || fs::exists(cppPath))
+    {
+        LOG_CONSOLE("[AssetsWindow] ERROR: Script already exists: %s", scriptName.c_str());
+        return;
+    }
+
+    // Generate templates
+    std::string headerCode = GenerateScriptHeader(scriptName);
+    std::string cppCode = GenerateScriptImplementation(scriptName);
+
+    // Write header file
+    std::ofstream headerFile(headerPath);
+    if (!headerFile.is_open())
+    {
+        LOG_CONSOLE("[AssetsWindow] ERROR: Failed to create header file: %s", headerPath.string().c_str());
+        return;
+    }
+    headerFile << headerCode;
+    headerFile.close();
+
+    // Write cpp file
+    std::ofstream cppFile(cppPath);
+    if (!cppFile.is_open())
+    {
+        LOG_CONSOLE("[AssetsWindow] ERROR: Failed to create cpp file: %s", cppPath.string().c_str());
+        // Clean up header if cpp fails
+        fs::remove(headerPath);
+        return;
+    }
+    cppFile << cppCode;
+    cppFile.close();
+
+    LOG_CONSOLE("========================================");
+    LOG_CONSOLE("Created new script files:");
+    LOG_CONSOLE("  %s", headerPath.string().c_str());
+    LOG_CONSOLE("  %s", cppPath.string().c_str());
+    LOG_CONSOLE("========================================");
+
+    // Automatically add to factory and dropdown
+    bool factorySuccess = AddScriptToFactory(scriptName);
+    bool dropdownSuccess = AddScriptToDropdown(scriptName);
+
+    if (factorySuccess && dropdownSuccess)
+    {
+        LOG_CONSOLE("Script FULLY automated!");
+        LOG_CONSOLE("- Added to dllmain.cpp factory");
+        LOG_CONSOLE("- Added to ComponentScript dropdown");
+        LOG_CONSOLE("========================================");
+        LOG_CONSOLE("NEXT STEP:");
+        LOG_CONSOLE("Rebuild Scripting project (button in Assets window)");
+        LOG_CONSOLE("========================================");
+    }
+    else
+    {
+        LOG_CONSOLE("========================================");
+        LOG_CONSOLE("WARNING: Automatic registration failed!");
+        LOG_CONSOLE("You need to manually:");
+        if (!factorySuccess)
+        {
+            LOG_CONSOLE("- Add to dllmain.cpp factory:");
+            LOG_CONSOLE("  else if (name == \"%s\")", scriptName.c_str());
+            LOG_CONSOLE("      script = new %s(owner);", scriptName.c_str());
+        }
+        if (!dropdownSuccess)
+        {
+            LOG_CONSOLE("- Add to ComponentScript::GetScriptClassesInDLL():");
+            LOG_CONSOLE("  classes.push_back(\"%s\");", scriptName.c_str());
+        }
+        LOG_CONSOLE("- Rebuild Scripting project");
+        LOG_CONSOLE("========================================");
+    }
+
+    // Refresh assets
+    RefreshAssets();
+}
+
+bool AssetsWindow::AddScriptToFactory(const std::string& scriptName)
+{
+    fs::path dllmainPath = fs::path(assetsRootPath).parent_path() / "Scripting" / "src" / "dllmain.cpp";
+
+    if (!fs::exists(dllmainPath))
+    {
+        LOG_CONSOLE("ERROR: dllmain.cpp not found");
+        return false;
+    }
+
+    // Read file
+    std::ifstream inFile(dllmainPath);
+    if (!inFile.is_open())
+    {
+        LOG_CONSOLE("ERROR: Could not open dllmain.cpp");
+        return false;
+    }
+
+    std::stringstream buffer;
+    buffer << inFile.rdbuf();
+    std::string content = buffer.str();
+    inFile.close();
+
+    // Check if already exists
+    std::string checkPattern = "else if (name == \"" + scriptName + "\")";
+    if (content.find(checkPattern) != std::string::npos)
+    {
+        LOG_CONSOLE("Script already in factory");
+        return true;
+    }
+
+    // Find where to add the include (after last #include)
+    size_t lastIncludePos = content.rfind("#include \"");
+    if (lastIncludePos == std::string::npos)
+    {
+        LOG_CONSOLE("ERROR: Could not find include section");
+        return false;
+    }
+
+    // Find end of that line
+    size_t includeEndPos = content.find('\n', lastIncludePos);
+    if (includeEndPos == std::string::npos)
+    {
+        LOG_CONSOLE("ERROR: Could not find include line end");
+        return false;
+    }
+
+    // Add include
+    std::string includeToAdd = "\n#include \"" + scriptName + ".h\"\n";
+    content.insert(includeEndPos + 1, includeToAdd);
+
+    // Find where to add the factory code (look for "// ADD MORE SCRIPTS HERE:")
+    size_t addMorePos = content.find("// ADD MORE SCRIPTS HERE:");
+    if (addMorePos != std::string::npos)
+    {
+        // Find the line before this comment
+        size_t lineStart = content.rfind('\n', addMorePos - 1);
+        if (lineStart != std::string::npos)
+        {
+            // Insert new factory code
+            std::string factoryCode = "\n    else if (name == \"" + scriptName + "\")\n"
+                                     "    {\n"
+                                     "        script = new " + scriptName + "(owner);\n"
+                                     "    }\n    ";
+            content.insert(lineStart + 1, factoryCode);
+        }
+    }
+    else
+    {
+        // Fallback: find the else block and add before "else"
+        size_t elsePos = content.find("else\n    {\n        std::cout << \"[ScriptDLL] ERROR: Unknown script:");
+        if (elsePos != std::string::npos)
+        {
+            // Find previous line
+            size_t lineStart = content.rfind('\n', elsePos - 1);
+            std::string factoryCode = "\n    else if (name == \"" + scriptName + "\")\n"
+                                     "    {\n"
+                                     "        script = new " + scriptName + "(owner);\n"
+                                     "    }\n    ";
+            content.insert(lineStart + 1, factoryCode);
+        }
+        else
+        {
+            LOG_CONSOLE("ERROR: Could not find factory insertion point");
+            return false;
+        }
+    }
+
+    // Write back
+    std::ofstream outFile(dllmainPath);
+    if (!outFile.is_open())
+    {
+        LOG_CONSOLE("ERROR: Could not write to dllmain.cpp");
+        return false;
+    }
+
+    outFile << content;
+    outFile.close();
+
+    LOG_CONSOLE("Added to dllmain.cpp factory");
+    return true;
+}
+
+bool AssetsWindow::AddScriptToDropdown(const std::string& scriptName)
+{
+    fs::path componentScriptPath = fs::path(assetsRootPath).parent_path() / "src" / "ComponentScript.cpp";
+
+    if (!fs::exists(componentScriptPath))
+    {
+        LOG_CONSOLE("ERROR: ComponentScript.cpp not found");
+        return false;
+    }
+
+    // Read file
+    std::ifstream inFile(componentScriptPath);
+    if (!inFile.is_open())
+    {
+        LOG_CONSOLE("ERROR: Could not open ComponentScript.cpp");
+        return false;
+    }
+
+    std::stringstream buffer;
+    buffer << inFile.rdbuf();
+    std::string content = buffer.str();
+    inFile.close();
+
+    // Check if already exists
+    std::string checkPattern = "classes.push_back(\"" + scriptName + "\")";
+    if (content.find(checkPattern) != std::string::npos)
+    {
+        LOG_CONSOLE("Script already in dropdown");
+        return true;
+    }
+
+    // Find the GetScriptClassesInDLL function and the "// ADD MORE SCRIPTS HERE AS YOU CREATE THEM" comment
+    size_t addMorePos = content.find("// ADD MORE SCRIPTS HERE AS YOU CREATE THEM");
+    if (addMorePos != std::string::npos)
+    {
+        // Find the line before this comment
+        size_t lineStart = content.rfind('\n', addMorePos - 1);
+        if (lineStart != std::string::npos)
+        {
+            // Insert new line
+            std::string dropdownCode = "\n        classes.push_back(\"" + scriptName + "\");";
+            content.insert(lineStart + 1, dropdownCode);
+        }
+    }
+    else
+    {
+        LOG_CONSOLE("ERROR: Could not find dropdown insertion point");
+        return false;
+    }
+
+    // Write back
+    std::ofstream outFile(componentScriptPath);
+    if (!outFile.is_open())
+    {
+        LOG_CONSOLE("ERROR: Could not write to ComponentScript.cpp");
+        return false;
+    }
+
+    outFile << content;
+    outFile.close();
+
+    LOG_CONSOLE("Added to ComponentScript dropdown");
     return true;
 }

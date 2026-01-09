@@ -12,7 +12,7 @@ typedef void* ScriptInstanceHandle;
 struct ScriptingAPI;
 
 extern "C" {
-    GAMESCRIPT_API ScriptInstanceHandle CreateScript(GameObjectHandle owner);
+    GAMESCRIPT_API ScriptInstanceHandle CreateScript(GameObjectHandle owner, const char* scriptName);
     GAMESCRIPT_API void DestroyScript(ScriptInstanceHandle instance);
     GAMESCRIPT_API void ScriptStart(ScriptInstanceHandle instance);
     GAMESCRIPT_API void ScriptUpdate(ScriptInstanceHandle instance, float deltaTime);

@@ -157,3 +157,46 @@ target_link_libraries(Engine PRIVATE imgui::imgui)
 target_link_libraries(Engine PRIVATE imguizmo::imguizmo)
 target_link_libraries(Engine PRIVATE nlohmann_json::nlohmann_json)
 target_link_libraries(Engine PRIVATE Tracy::TracyClient)
+
+# ==================== SCRIPTING DLL PROJECT ====================
+
+set(SCRIPTING_BASE_HEADERS
+    Scripting/src/pch.h
+    Scripting/src/framework.h
+    Scripting/src/GameScriptAPI.h
+)
+
+set(SCRIPTING_BASE_SOURCES
+    Scripting/src/pch.cpp
+    Scripting/src/dllmain.cpp
+)
+
+file(GLOB SCRIPTING_AUTO_HEADERS "Scripting/src/*.h")
+file(GLOB SCRIPTING_AUTO_SOURCES "Scripting/src/*.cpp")
+
+list(REMOVE_ITEM SCRIPTING_AUTO_HEADERS
+    ${CMAKE_CURRENT_SOURCE_DIR}/Scripting/src/pch.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Scripting/src/framework.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Scripting/src/GameScriptAPI.h
+)
+list(REMOVE_ITEM SCRIPTING_AUTO_SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/Scripting/src/pch.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Scripting/src/dllmain.cpp
+)
+
+source_group("Header Files" FILES ${SCRIPTING_BASE_HEADERS} ${SCRIPTING_AUTO_HEADERS})
+source_group("Source Files" FILES ${SCRIPTING_BASE_SOURCES} ${SCRIPTING_AUTO_SOURCES})
+
+add_library(Scripting SHARED
+    ${SCRIPTING_BASE_HEADERS}
+    ${SCRIPTING_BASE_SOURCES}
+    ${SCRIPTING_AUTO_HEADERS}
+    ${SCRIPTING_AUTO_SOURCES}
+)
+
+set_target_properties(Scripting PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/x64/$<CONFIG>"
+    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/x64/$<CONFIG>"
+)
+
+target_compile_definitions(Scripting PRIVATE SCRIPTING_EXPORTS)

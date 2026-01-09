@@ -10,7 +10,7 @@ typedef void* GameObjectHandle;
 typedef void* ScriptInstanceHandle;
 
 // Function pointer types
-typedef ScriptInstanceHandle(*CreateScriptFunc)(GameObjectHandle owner);
+typedef ScriptInstanceHandle(*CreateScriptFunc)(GameObjectHandle owner, const char* scriptName);
 typedef void (*DestroyScriptFunc)(ScriptInstanceHandle instance);
 typedef void (*ScriptStartFunc)(ScriptInstanceHandle instance);
 typedef void (*ScriptUpdateFunc)(ScriptInstanceHandle instance, float deltaTime);
@@ -25,19 +25,34 @@ public:
     void Update() override;
     void OnEditor() override;
 
-    void LoadScript(const std::string& scriptName);
+    // Serialization
+    void Serialize(nlohmann::json& componentObj) const override;
+    void Deserialize(const nlohmann::json& componentObj) override;
+
+    void LoadScript(const std::string& dllName, const std::string& scriptClassName);
     void UnloadScript();
 
-    const std::string& GetScriptName() const { return scriptName; }
+    const std::string& GetDllName() const { return dllName; }
+    const std::string& GetScriptClassName() const { return scriptClassName; }
     bool IsScriptLoaded() const { return scriptLoaded; }
+    bool IsMarkedForRemoval() const { return markedForRemoval; }
+
+    // Scripts getters
+    static std::vector<std::string> GetAvailableScripts();
+    static std::vector<std::string> GetScriptClassesInDLL(const std::string& dllName);
+
+    // Build system
+    static bool BuildScriptingProject();
 
 private:
     bool CheckForDllChange();
     void CleanupTempDLL();
 
-    std::string scriptName = "None";
+    std::string dllName = "None";
+    std::string scriptClassName = "None";
     bool scriptLoaded = false;
     bool startCalled = false;
+    bool markedForRemoval = false;
 
     // Hot-reload support
     std::string tempDllPath;

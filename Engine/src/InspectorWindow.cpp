@@ -806,6 +806,17 @@ void InspectorWindow::DrawScriptComponent(GameObject* selectedObject)
     {
         scriptComp->OnEditor();
     }
+
+    // Check if component was marked for removal after rendering
+    // We need to check again because the pointer might be invalid
+    scriptComp = static_cast<ComponentScript*>(
+        selectedObject->GetComponent(ComponentType::SCRIPT)
+        );
+
+    if (scriptComp && scriptComp->IsMarkedForRemoval())
+    {
+        selectedObject->RemoveComponent(scriptComp);
+    }
 }
 
 bool InspectorWindow::DrawGameObjectSection(GameObject* selectedObject)

@@ -99,9 +99,17 @@ private:
     // Test function (temporal)
     bool TestImportSystem();
 
+    // Script creation
+    void CreateNewScript(const std::string& scriptName);
+    std::string GenerateScriptHeader(const std::string& className);
+    std::string GenerateScriptImplementation(const std::string& className);
+    bool AddScriptToFactory(const std::string& scriptName);
+    bool AddScriptToDropdown(const std::string& scriptName);
+
     std::string assetsRootPath;
     std::string currentPath;
     std::string sceneRootPath;
+    std::string scriptingRootPath;
     std::vector<AssetEntry> currentAssets;
 
     AssetEntry* selectedAsset;
@@ -111,6 +119,10 @@ private:
 
     bool showDeleteConfirmation;
     AssetEntry assetToDelete;
+
+    // Script creation dialog
+    bool showCreateScriptDialog;
+    char newScriptNameBuffer[128];
 
     // Para rastrear qué FBX están expandidos
     std::unordered_set<std::string> expandedFBXPaths;

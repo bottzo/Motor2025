@@ -74,6 +74,27 @@ Component* GameObject::CreateComponent(ComponentType type) {
     return newComponent;
 }
 
+void GameObject::RemoveComponent(Component* component) {
+    if (!component) return;
+
+    // Remove from components vector
+    auto it = std::find(components.begin(), components.end(), component);
+    if (it != components.end()) {
+        components.erase(it);
+    }
+
+    // Remove from componentOwners vector 
+    auto ownerIt = std::find_if(componentOwners.begin(), componentOwners.end(),
+        [component](const std::unique_ptr<Component>& ptr) {
+            return ptr.get() == component;
+        });
+
+    if (ownerIt != componentOwners.end()) {
+        componentOwners.erase(ownerIt);
+        LOG_CONSOLE("Component removed successfully");
+    }
+}
+
 Component* GameObject::GetComponent(ComponentType type) const {
     for (auto* comp : components) {
         if (comp->GetType() == type) {

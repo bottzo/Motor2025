@@ -1,2 +1,6 @@
-C:\Users\aalca\Documents\GitHub\Motor2025\Engine\Scripting\dllmain.cpp;C:\Users\aalca\Documents\GitHub\Motor2025\Engine\Scripting\x64\Debug\dllmain.obj
-C:\Users\aalca\Documents\GitHub\Motor2025\Engine\Scripting\pch.cpp;C:\Users\aalca\Documents\GitHub\Motor2025\Engine\Scripting\x64\Debug\pch.obj
+C:\Users\haosh\Documents\GitHub\Motor2025\Engine\Scripting\dllmain.cpp;C:\Users\haosh\Documents\GitHub\Motor2025\Engine\Scripting\x64\Debug\dllmain.obj
+C:\Users\haosh\Documents\GitHub\Motor2025\Engine\Scripting\Ball.cpp;C:\Users\haosh\Documents\GitHub\Motor2025\Engine\Scripting\x64\Debug\Ball.obj
+C:\Users\haosh\Documents\GitHub\Motor2025\Engine\Scripting\EnemyIA.cpp;C:\Users\haosh\Documents\GitHub\Motor2025\Engine\Scripting\x64\Debug\EnemyIA.obj
+C:\Users\haosh\Documents\GitHub\Motor2025\Engine\Scripting\PlayerMovement.cpp;C:\Users\haosh\Documents\GitHub\Motor2025\Engine\Scripting\x64\Debug\PlayerMovement.obj
+C:\Users\haosh\Documents\GitHub\Motor2025\Engine\Scripting\TankScript.cpp;C:\Users\haosh\Documents\GitHub\Motor2025\Engine\Scripting\x64\Debug\TankScript.obj
+C:\Users\haosh\Documents\GitHub\Motor2025\Engine\Scripting\pch.cpp;C:\Users\haosh\Documents\GitHub\Motor2025\Engine\Scripting\x64\Debug\pch.obj

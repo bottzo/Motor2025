@@ -13,6 +13,7 @@ public:
     ~GameObject();
 
     Component* CreateComponent(ComponentType type);
+    void RemoveComponent(Component* component);
 
     Component* GetComponent(ComponentType type) const;
 
