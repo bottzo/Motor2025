@@ -189,6 +189,10 @@ bool FileSystem::Update()
                     LOG_CONSOLE("[FileSystem] Texture loaded: %s", filePath.c_str());
                 }
             }
+            else if (fileType == DROPPED_SCRIPT) 
+            {
+
+            }
         }
     }
 

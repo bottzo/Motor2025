@@ -260,6 +260,8 @@ bool Input::PreUpdate()
 						droppedFileType = DROPPED_FBX;
 					else if (extension == ".png" || extension == ".dds")
 						droppedFileType = DROPPED_TEXTURE;
+					else if (extension == ".h" || extension == ".cpp")
+						droppedFileType = DROPPED_SCRIPT;
 					else
 						droppedFileType = DROPPED_NONE;
 				}
