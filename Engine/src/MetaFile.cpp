@@ -7,9 +7,6 @@
 #include <windows.h>
 #include "Log.h"
 
-// META FILE IMPLEMENTATION
-///////////////////////////////
-
 UID MetaFile::GenerateUID() {
     std::random_device rd;
     std::mt19937_64 gen(rd());
@@ -39,21 +36,17 @@ bool MetaFile::Save(const std::string& metaFilePath) const {
         return false;
     }
 
-    // Check if this is a script file
     if (IsScript()) {
-        // Simple Unity-style format for scripts
         file << "fileFormatVersion: 2\n";
         file << "guid: " << std::hex << std::setw(16) << std::setfill('0') << uid << std::dec << "\n";
     }
     else {
-        // Full format for assets (FBX, textures, etc.)
         std::string relativeOriginalPath = MakeRelativeToProject(originalPath);
 
         file << "uid: " << uid << "\n";
         file << "type: " << static_cast<int>(type) << "\n";
         file << "lastModified: " << lastModified << "\n";
 
-        // Model settings
         file << "importScale: " << importSettings.importScale << "\n";
         file << "generateNormals: " << (importSettings.generateNormals ? "1" : "0") << "\n";
         file << "flipUVs: " << (importSettings.flipUVs ? "1" : "0") << "\n";
@@ -61,7 +54,6 @@ bool MetaFile::Save(const std::string& metaFilePath) const {
         file << "upAxis: " << importSettings.upAxis << "\n";
         file << "frontAxis: " << importSettings.frontAxis << "\n";
 
-        // Texture settings
         file << "generateMipmaps: " << (importSettings.generateMipmaps ? "1" : "0") << "\n";
         file << "filterMode: " << importSettings.filterMode << "\n";
         file << "flipHorizontal: " << (importSettings.flipHorizontal ? "1" : "0") << "\n";
@@ -95,7 +87,6 @@ MetaFile MetaFile::Load(const std::string& metaFilePath) {
             continue;
         }
         else if (key == "guid") {
-            // Parse hex GUID for scripts
             if (isScriptFormat) {
                 meta.uid = std::stoull(value, nullptr, 16);
             }
@@ -115,7 +106,6 @@ MetaFile MetaFile::Load(const std::string& metaFilePath) {
         else if (key == "lastModified") {
             meta.lastModified = std::stoll(value);
         }
-        // Model settings
         else if (key == "importScale") {
             meta.importSettings.importScale = std::stof(value);
         }
@@ -134,7 +124,6 @@ MetaFile MetaFile::Load(const std::string& metaFilePath) {
         else if (key == "frontAxis") {
             meta.importSettings.frontAxis = std::stoi(value);
         }
-        // Texture settings
         else if (key == "generateMipmaps") {
             meta.importSettings.generateMipmaps = (value == "1");
         }
@@ -155,7 +144,6 @@ MetaFile MetaFile::Load(const std::string& metaFilePath) {
 }
 
 bool MetaFile::NeedsReimport(const std::string& assetPath) const {
-    // Scripts never need reimport based on modification time
     if (IsScript()) {
         return false;
     }
@@ -167,7 +155,6 @@ bool MetaFile::NeedsReimport(const std::string& assetPath) const {
     long long currentTimestamp = std::filesystem::last_write_time(assetPath)
         .time_since_epoch().count();
 
-    // Tolerance of a few seconds
     const long long tolerance = 20000000000;
 
     long long diff = std::abs(currentTimestamp - lastModified);
@@ -183,14 +170,12 @@ std::string MetaFile::MakeRelativeToProject(const std::string& absolutePath) {
     try {
         std::filesystem::path absPath(absolutePath);
         std::filesystem::path projectRoot = LibraryManager::GetAssetsRoot();
-        projectRoot = projectRoot.parent_path(); // Assets/ -> Project root
+        projectRoot = projectRoot.parent_path();
 
-        // If already relative or can't make relative, return as is
         if (absPath.is_relative()) {
             return absolutePath;
         }
 
-        // Make relative to project root
         std::filesystem::path relativePath = std::filesystem::relative(absPath, projectRoot);
 
         std::string result = relativePath.string();
@@ -211,16 +196,13 @@ std::string MetaFile::MakeAbsoluteFromProject(const std::string& relativePath) {
     try {
         std::filesystem::path relPath(relativePath);
 
-        // If already absolute, return as is
         if (relPath.is_absolute()) {
             return relativePath;
         }
 
-        // Get project root
         std::filesystem::path projectRoot = LibraryManager::GetAssetsRoot();
         projectRoot = projectRoot.parent_path();
 
-        // Combine project root + relative path
         std::filesystem::path absolutePath = projectRoot / relPath;
 
         return absolutePath.string();
@@ -233,7 +215,6 @@ std::string MetaFile::MakeAbsoluteFromProject(const std::string& relativePath) {
 void MetaFileManager::Initialize() {
     CleanOrphanedMetaFiles();
     ScanAssets();
-    ScanScripts();
 }
 
 void MetaFileManager::ScanAssets() {
@@ -247,32 +228,33 @@ void MetaFileManager::ScanAssets() {
     int metasCreated = 0;
     int metasExisting = 0;
 
-    // Recursively iterate through Assets/
     for (const auto& entry : std::filesystem::recursive_directory_iterator(assetsPath)) {
         if (!entry.is_regular_file()) continue;
 
         std::string assetPath = entry.path().string();
         std::string extension = entry.path().extension().string();
 
-        // Skip .meta files
         if (extension == ".meta") continue;
 
         AssetType type = MetaFile::GetAssetType(extension);
-        if (type == AssetType::UNKNOWN) continue; // Unsupported type
+        if (type == AssetType::UNKNOWN) continue;
 
         std::string metaPath = GetMetaPath(assetPath);
 
-        // Only create .meta if it doesn't exist
         if (!std::filesystem::exists(metaPath)) {
-            // Create new .meta
             MetaFile meta;
             meta.uid = MetaFile::GenerateUID();
             meta.type = type;
             meta.originalPath = assetPath;
-            meta.lastModified = GetFileTimestamp(assetPath);
+
+            if (type != AssetType::SCRIPT_H && type != AssetType::SCRIPT_CPP) {
+                meta.lastModified = GetFileTimestamp(assetPath);
+            }
 
             if (meta.Save(metaPath)) {
                 metasCreated++;
+                LOG_DEBUG("[MetaFileManager] Created .meta for: %s",
+                    entry.path().filename().string().c_str());
             }
         }
         else {
@@ -294,21 +276,17 @@ void MetaFileManager::CleanOrphanedMetaFiles() {
 
     int metasDeleted = 0;
 
-    // Find all .meta files
     for (const auto& entry : std::filesystem::recursive_directory_iterator(assetsPath)) {
         if (!entry.is_regular_file()) continue;
 
         std::string filePath = entry.path().string();
         std::string extension = entry.path().extension().string();
 
-        // Meta files only
         if (extension != ".meta") continue;
 
-        // Remove .meta extension
         std::string assetPath = filePath.substr(0, filePath.length() - 5);
 
         if (!std::filesystem::exists(assetPath)) {
-            // Deleting orphaned .meta file
             try {
                 std::filesystem::remove(filePath);
                 LOG_CONSOLE("[MetaFileManager] Deleted orphaned .meta: %s", filePath.c_str());
@@ -358,14 +336,12 @@ void MetaFileManager::CheckForChanges() {
             }
         }
 
-        // Create missing .meta files for new assets
         for (const auto& entry : std::filesystem::recursive_directory_iterator(assetsPath)) {
             if (!entry.is_regular_file()) continue;
 
             std::string assetPath = entry.path().string();
             std::string extension = entry.path().extension().string();
 
-            // Skip .meta files
             if (extension == ".meta") continue;
 
             AssetType type = MetaFile::GetAssetType(extension);
@@ -373,13 +349,15 @@ void MetaFileManager::CheckForChanges() {
 
             std::string metaPath = GetMetaPath(assetPath);
 
-            // Create .meta if it doesnt exist
             if (!std::filesystem::exists(metaPath)) {
                 MetaFile meta;
                 meta.uid = MetaFile::GenerateUID();
                 meta.type = type;
                 meta.originalPath = assetPath;
-                meta.lastModified = GetFileTimestamp(assetPath);
+
+                if (type != AssetType::SCRIPT_H && type != AssetType::SCRIPT_CPP) {
+                    meta.lastModified = GetFileTimestamp(assetPath);
+                }
 
                 if (meta.Save(metaPath)) {
                     LOG_CONSOLE("[MetaFileManager] Created .meta for new asset: %s", assetPath.c_str());
@@ -400,35 +378,29 @@ void MetaFileManager::CheckForChanges() {
 bool MetaFileManager::UpdateMetaIfModified(const std::string& assetPath) {
     std::string metaPath = GetMetaPath(assetPath);
 
-    // If no .meta exists, create new one
     if (!std::filesystem::exists(metaPath)) {
         LOG_CONSOLE("[MetaFileManager] No .meta found, creating for: %s", assetPath.c_str());
         GetOrCreateMeta(assetPath);
         return true;
     }
 
-    // Load existing .meta
     MetaFile meta = MetaFile::Load(metaPath);
 
-    // Scripts don't track modification time
     std::filesystem::path path(assetPath);
     std::string extension = path.extension().string();
     AssetType type = MetaFile::GetAssetType(extension);
 
     if (type == AssetType::SCRIPT_H || type == AssetType::SCRIPT_CPP) {
-        return false; // Scripts don't need timestamp updates
+        return false;
     }
 
-    // Check if timestamp changed for non-script assets
     long long currentTimestamp = GetFileTimestamp(assetPath);
 
     if (meta.lastModified != currentTimestamp) {
         LOG_CONSOLE("[MetaFileManager] File modified, updating .meta: %s", assetPath.c_str());
 
-        // Update timestamp
         meta.lastModified = currentTimestamp;
 
-        // Save changes
         if (meta.Save(metaPath)) {
             LOG_CONSOLE("[MetaFileManager] .meta updated successfully");
             return true;
@@ -439,18 +411,15 @@ bool MetaFileManager::UpdateMetaIfModified(const std::string& assetPath) {
         }
     }
 
-    // No update needed
     return false;
 }
 
 MetaFile MetaFileManager::GetOrCreateMeta(const std::string& assetPath) {
     std::string metaPath = GetMetaPath(assetPath);
 
-    // Try loading existing .meta
     if (std::filesystem::exists(metaPath)) {
         MetaFile meta = MetaFile::Load(metaPath);
 
-        // If no UID, assign one now
         if (meta.uid == 0) {
             meta.uid = MetaFile::GenerateUID();
             meta.Save(metaPath);
@@ -459,13 +428,11 @@ MetaFile MetaFileManager::GetOrCreateMeta(const std::string& assetPath) {
         return meta;
     }
 
-    // Create new .meta
     MetaFile meta;
     meta.uid = MetaFile::GenerateUID();
     meta.type = MetaFile::GetAssetType(std::filesystem::path(assetPath).extension().string());
     meta.originalPath = assetPath;
 
-    // Only set lastModified for non-script assets
     if (meta.type != AssetType::SCRIPT_H && meta.type != AssetType::SCRIPT_CPP) {
         meta.lastModified = GetFileTimestamp(assetPath);
     }
@@ -479,7 +446,7 @@ bool MetaFileManager::NeedsReimport(const std::string& assetPath) {
     std::string metaPath = GetMetaPath(assetPath);
 
     if (!std::filesystem::exists(metaPath)) {
-        return true; // No .meta, needs import
+        return true;
     }
 
     MetaFile meta = MetaFile::Load(metaPath);
@@ -497,13 +464,12 @@ MetaFile MetaFileManager::LoadMeta(const std::string& assetPath) {
         return MetaFile::Load(metaPath);
     }
 
-    return MetaFile();  // Return empty meta if doesn't exist
+    return MetaFile();
 }
 
 UID MetaFileManager::GetUIDFromAsset(const std::string& assetPath) {
     MetaFile meta = LoadMeta(assetPath);
 
-    // If no UID, generate one and save
     if (meta.uid == 0 && std::filesystem::exists(assetPath)) {
         meta.uid = MetaFile::GenerateUID();
         meta.type = MetaFile::GetAssetType(std::filesystem::path(assetPath).extension().string());
@@ -523,14 +489,12 @@ std::string MetaFileManager::GetAssetFromUID(UID uid) {
         return "";
     }
 
-    // Search all .meta files
     for (const auto& entry : std::filesystem::recursive_directory_iterator(assetsPath)) {
         if (!entry.is_regular_file()) continue;
 
         std::string path = entry.path().string();
         std::string extension = entry.path().extension().string();
 
-        // Only .meta files
         if (extension != ".meta") continue;
 
         MetaFile meta = MetaFile::Load(path);
@@ -539,7 +503,7 @@ std::string MetaFileManager::GetAssetFromUID(UID uid) {
         }
     }
 
-    return "";  // Not found
+    return "";
 }
 
 long long MetaFileManager::GetFileTimestamp(const std::string& filePath) {
@@ -550,55 +514,6 @@ long long MetaFileManager::GetFileTimestamp(const std::string& filePath) {
     return std::filesystem::last_write_time(filePath).time_since_epoch().count();
 }
 
-// Private Helpers
-
 std::string MetaFileManager::GetMetaPath(const std::string& assetPath) {
     return assetPath + ".meta";
-}
-
-void MetaFileManager::ScanScripts() {
-    std::string scriptingPath = LibraryManager::GetScriptingRoot() + "/src";
-
-    if (!std::filesystem::exists(scriptingPath)) {
-        LOG_DEBUG("[MetaFileManager] Scripting/src folder not found: %s", scriptingPath.c_str());
-        return;
-    }
-
-    int metasCreated = 0;
-    int metasExisting = 0;
-
-    for (const auto& entry : std::filesystem::directory_iterator(scriptingPath)) {
-        if (!entry.is_regular_file()) continue;
-
-        std::string scriptPath = entry.path().string();
-        std::string extension = entry.path().extension().string();
-
-        // Only .h and .cpp files
-        if (extension != ".h" && extension != ".cpp") continue;
-
-        std::string metaPath = GetMetaPath(scriptPath);
-
-        // Create .meta if it doesn't exist
-        if (!std::filesystem::exists(metaPath)) {
-            MetaFile meta;
-            meta.uid = MetaFile::GenerateUID();
-            meta.type = MetaFile::GetAssetType(extension);
-            meta.originalPath = scriptPath;
-            // No lastModified for scripts
-
-            if (meta.Save(metaPath)) {
-                metasCreated++;
-                LOG_DEBUG("[MetaFileManager] Created .meta for script: %s",
-                    entry.path().filename().string().c_str());
-            }
-        }
-        else {
-            metasExisting++;
-        }
-    }
-
-    if (metasCreated > 0) {
-        LOG_CONSOLE("[MetaFileManager] Scripts scan: %d created, %d existing",
-            metasCreated, metasExisting);
-    }
 }

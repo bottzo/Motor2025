@@ -1,5 +1,6 @@
 ﻿#include "LibraryManager.h"
 #include "Log.h"
+#include "BuildConfig.h"
 #include <iostream>
 #include <windows.h>
 #include "MetaFile.h"
@@ -18,32 +19,23 @@ bool LibraryManager::s_initialized = false;
 fs::path LibraryManager::s_projectRoot;
 fs::path LibraryManager::s_scriptingRoot;
 
-// Function to rotate vertices according to axis configuration
 void ApplyAxisConversion(Mesh& mesh, int upAxis, int frontAxis) {
-    // upAxis: 0=Y-Up, 1=Z-Up
-    // frontAxis: 0=Z-Forward, 1=Y-Forward, 2=X-Forward
     glm::mat4 transform = glm::mat4(1.0f);
 
-    // Up Axis conversions
-    if (upAxis == 1) {  // Z-Up (rotate from Y-Up to Z-Up)
-        // Rotate -90° around X axis
+    if (upAxis == 1) {
         transform = glm::rotate(transform, glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
         LOG_DEBUG("[AxisConversion] Applying Z-Up conversion (rotate -90° on X)");
     }
 
-    // Front Axis conversions
-    if (frontAxis == 1) {  // Y-Forward (from Z-Forward)
-        // Rotate 90° around X axis
+    if (frontAxis == 1) {
         transform = glm::rotate(transform, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
         LOG_DEBUG("[AxisConversion] Applying Y-Forward conversion (rotate 90° on X)");
     }
-    else if (frontAxis == 2) {  // X-Forward (from Z-Forward)
-        // Rotate -90° around Y axis
+    else if (frontAxis == 2) {
         transform = glm::rotate(transform, glm::radians(-90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
         LOG_DEBUG("[AxisConversion] Applying X-Forward conversion (rotate -90° on Y)");
     }
 
-    // Apply transformation to all vertices
     for (auto& vertex : mesh.vertices) {
         glm::vec4 pos = glm::vec4(vertex.position, 1.0f);
         glm::vec4 norm = glm::vec4(vertex.normal, 0.0f);
@@ -62,8 +54,6 @@ void LibraryManager::Initialize() {
     }
 
     LOG_CONSOLE("[LibraryManager] Initializing library structure...");
-
-    namespace fs = std::filesystem;
 
     char buffer[MAX_PATH];
     GetModuleFileNameA(NULL, buffer, MAX_PATH);
@@ -95,14 +85,14 @@ void LibraryManager::Initialize() {
         return;
     }
 
-    s_scriptingRoot = s_projectRoot / "Scripting";
+    // Scripts siempre en Assets/Scripts/
+    s_scriptingRoot = s_projectRoot / "Assets" / "Scripts";
     if (!fs::exists(s_scriptingRoot)) {
-        LOG_CONSOLE("[LibraryManager] WARNING: Scripting folder not found, creating it...");
+        LOG_CONSOLE("[LibraryManager] Scripts folder not found, creating it...");
         EnsureDirectoryExists(s_scriptingRoot);
-        EnsureDirectoryExists(s_scriptingRoot / "src");
     }
     else {
-        LOG_CONSOLE("[LibraryManager] Scripting folder found at: %s", s_scriptingRoot.string().c_str());
+        LOG_CONSOLE("[LibraryManager] Scripts folder found at: %s", s_scriptingRoot.string().c_str());
     }
 
     fs::path libraryRoot = s_projectRoot / "Library";
@@ -125,19 +115,18 @@ std::string LibraryManager::GetScriptingRoot() {
 }
 
 std::string LibraryManager::GetScriptPathFromClassName(const std::string& className) {
-    fs::path scriptingSrc = s_scriptingRoot / "src";
+    fs::path scriptingPath = s_scriptingRoot;
 
-    if (!fs::exists(scriptingSrc)) {
+    if (!fs::exists(scriptingPath)) {
         return "";
     }
 
-    for (const auto& entry : fs::directory_iterator(scriptingSrc)) {
+    for (const auto& entry : fs::directory_iterator(scriptingPath)) {
         if (!entry.is_regular_file()) continue;
 
         std::string filename = entry.path().stem().string();
         std::string extension = entry.path().extension().string();
 
-        // Look for .h file matching class name
         if (extension == ".h" && filename == className) {
             std::string metaPath = entry.path().string() + ".meta";
 
@@ -164,7 +153,6 @@ bool LibraryManager::ImportScriptToLibrary(const std::string& headerPath, const 
         return false;
     }
 
-    // Get or create .meta for the header
     std::string metaPath = headerPath + ".meta";
     MetaFile meta;
 
@@ -184,10 +172,8 @@ bool LibraryManager::ImportScriptToLibrary(const std::string& headerPath, const 
         return false;
     }
 
-    // Copy DLL to Library/Scripts/{UID}.script
     std::string scriptLibraryPath = GetScriptPathFromUID(meta.uid);
 
-    // NUEVO: Asegurar que el directorio existe
     fs::path scriptsDir = fs::path(scriptLibraryPath).parent_path();
     if (!fs::exists(scriptsDir)) {
         try {
@@ -238,7 +224,6 @@ std::string LibraryManager::GetAssetsRoot() {
     return (s_projectRoot / "Assets").string();
 }
 
-// UID-based methods (primary)
 std::string LibraryManager::GetMeshPathFromUID(unsigned long long uid) {
     std::string filename = std::to_string(uid) + ".mesh";
     return (s_projectRoot / "Library" / "Meshes" / filename).string();
@@ -376,7 +361,6 @@ bool LibraryManager::ReimportAsset(const std::string& assetPath) {
     case AssetType::MODEL_FBX: {
         LOG_CONSOLE("[LibraryManager] Reimporting FBX model...");
 
-        // Delete old mesh files
         int deletedCount = 0;
         for (int i = 0; i < 100; i++) {
             unsigned long long meshUID = meta.uid + i;
@@ -398,7 +382,6 @@ bool LibraryManager::ReimportAsset(const std::string& assetPath) {
 
         LOG_CONSOLE("[LibraryManager] Deleted %d old mesh files", deletedCount);
 
-        // Build import flags from .meta settings
         unsigned int importFlags = aiProcess_Triangulate |
             aiProcess_JoinIdenticalVertices |
             aiProcess_ValidateDataStructure;

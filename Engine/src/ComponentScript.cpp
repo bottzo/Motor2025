@@ -2,12 +2,14 @@
 #include "GameObject.h"
 #include "Application.h"
 #include "Log.h"
+#include "BuildConfig.h"
 #include <imgui.h>
 #include <filesystem>
 #include <fstream>
 #include <thread>
 #include <chrono>
 #include "LibraryManager.h"
+#include "MetaFile.h"
 
 ComponentScript::ComponentScript(GameObject* owner)
     : Component(owner, ComponentType::SCRIPT)
@@ -38,7 +40,6 @@ void ComponentScript::LoadScript(const std::string& dllName, const std::string& 
         return;
     }
 
-    // Guardar el timestamp del DLL para detectar recompilaciones
     try {
         lastDllWriteTime = std::filesystem::last_write_time(originalDllPath);
     }
@@ -46,7 +47,6 @@ void ComponentScript::LoadScript(const std::string& dllName, const std::string& 
         lastDllWriteTime = std::filesystem::file_time_type::min();
     }
 
-    // Crear copia temporal (esto es liada ahora mismo y se debe borrar en futuro porque esta ya pasado)
     auto now = std::chrono::system_clock::now();
     auto timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
 
@@ -54,13 +54,9 @@ void ComponentScript::LoadScript(const std::string& dllName, const std::string& 
     std::string tempPdbPath = "x64\\Debug\\" + dllName + "_temp_" + std::to_string(timestamp) + ".pdb";
     std::string originalPdbPath = "x64\\Debug\\" + dllName + ".pdb";
 
-    // esto tambien habra que borrarlo se hizo cuando no funcionaba el hot reloading
-    // Copiar DLL Y PDB con espera adecuada
     try {
-        // Esperar a que el compilador termine completamente
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
-        // Intentar multiples veces en caso de que el archivo esté bloqueado
         int maxRetries = 10;
         bool success = false;
 
@@ -71,11 +67,9 @@ void ComponentScript::LoadScript(const std::string& dllName, const std::string& 
             }
 
             try {
-                // Copiar DLL
                 std::filesystem::copy_file(originalDllPath, tempDllPath,
                     std::filesystem::copy_options::overwrite_existing);
 
-                // Copiar PDB si existe (puede no existir en Release)
                 if (std::filesystem::exists(originalPdbPath)) {
                     std::filesystem::copy_file(originalPdbPath, tempPdbPath,
                         std::filesystem::copy_options::overwrite_existing);
@@ -99,7 +93,6 @@ void ComponentScript::LoadScript(const std::string& dllName, const std::string& 
 
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
-    // Cargar DLL temporal
     scriptDLL = LoadLibraryA(tempDllPath.c_str());
 
     if (scriptDLL == nullptr)
@@ -111,7 +104,6 @@ void ComponentScript::LoadScript(const std::string& dllName, const std::string& 
         return;
     }
 
-    // Obtener funciones
     CreateScript = (CreateScriptFunc)GetProcAddress(scriptDLL, "CreateScript");
     DestroyScript = (DestroyScriptFunc)GetProcAddress(scriptDLL, "DestroyScript");
     ScriptStart = (ScriptStartFunc)GetProcAddress(scriptDLL, "ScriptStart");
@@ -125,14 +117,12 @@ void ComponentScript::LoadScript(const std::string& dllName, const std::string& 
         return;
     }
 
-    // Pasar API del engine
     ScriptingAPI* engineAPI = Application::GetInstance().scripting->GetEngineAPI();
     if (engineAPI && ScriptSetAPI)
     {
         ScriptSetAPI(engineAPI);
     }
 
-    // Crear instancia del script
     scriptInstance = CreateScript(static_cast<GameObjectHandle>(owner), scriptClassName.c_str());
 
     if (scriptInstance == nullptr)
@@ -175,8 +165,6 @@ void ComponentScript::UnloadScript()
     CleanupTempDLL();
 }
 
-// ==================== SERIALIZATION ====================
-
 void ComponentScript::Serialize(nlohmann::json& componentObj) const
 {
     componentObj["dllName"] = dllName;
@@ -191,14 +179,12 @@ void ComponentScript::Deserialize(const nlohmann::json& componentObj)
         UnloadScript();
     }
 
-    // Load saved script data
     if (componentObj.contains("dllName") && componentObj.contains("scriptClassName"))
     {
         std::string savedDllName = componentObj["dllName"];
         std::string savedClassName = componentObj["scriptClassName"];
         bool wasLoaded = componentObj.value("scriptLoaded", false);
 
-        // Only reload if it was previously loaded
         if (wasLoaded && savedDllName != "None" && savedClassName != "None")
         {
             LOG_CONSOLE("[ComponentScript] Restoring script: %s::%s", savedDllName.c_str(), savedClassName.c_str());
@@ -211,7 +197,6 @@ void ComponentScript::CleanupTempDLL()
 {
     if (!tempDllPath.empty())
     {
-        // Limpiar tanto el DLL como el PDB
         std::string tempPdbPath = tempDllPath;
         size_t pos = tempPdbPath.find(".dll");
         if (pos != std::string::npos) {
@@ -242,7 +227,6 @@ void ComponentScript::Update()
 {
     if (!active) return;
 
-    // Solo detecta cuando recompilas manualmente el DLL
     if (scriptLoaded && CheckForDllChange())
     {
         LOG_CONSOLE("DLL RECOMPILED DETECTED!");
@@ -256,14 +240,12 @@ void ComponentScript::Update()
 
     if (!scriptLoaded || !scriptInstance) return;
 
-    // Llamar Start una vez
     if (!startCalled && ScriptStart)
     {
         ScriptStart(scriptInstance);
         startCalled = true;
     }
 
-    // Llamar Update cada frame
     if (ScriptUpdate)
     {
         float deltaTime = Application::GetInstance().time->GetDeltaTime();
@@ -279,27 +261,23 @@ bool ComponentScript::CheckForDllChange()
 
     try {
         if (!std::filesystem::exists(originalDllPath)) {
-            LOG_DEBUG("DLL not found: %s", originalDllPath.c_str());
             return false;
         }
 
         auto currentWriteTime = std::filesystem::last_write_time(originalDllPath);
 
-        // Si el DLL cambió (fue recompilado)
         if (currentWriteTime != lastDllWriteTime)
         {
             LOG_CONSOLE("DLL timestamp changed!");
-            // Esperar a que termine de escribirse
             std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
-            // Reload script
             std::string tempDll = dllName;
             std::string tempClass = scriptClassName;
             UnloadScript();
             std::this_thread::sleep_for(std::chrono::milliseconds(300));
             LoadScript(tempDll, tempClass);
 
-            return false; // Already handled reload
+            return false;
         }
     }
     catch (const std::exception& e) {
@@ -362,7 +340,6 @@ void ComponentScript::OnEditor()
     {
         ImGui::TextColored(ImVec4(1.0f, 0.3f, 0.3f, 1.0f), "No Script Loaded");
 
-        // Refresh available scripts 
         static std::vector<std::string> availableScripts;
         static int selectedScriptIndex = 0;
 
@@ -374,13 +351,12 @@ void ComponentScript::OnEditor()
         {
             ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f), "No compiled scripts found!");
             ImGui::Spacing();
-            ImGui::TextWrapped("Create .h/.cpp files in Scripting folder, then compile to generate DLL");
+            ImGui::TextWrapped("Create .h/.cpp files in Assets/Scripts folder, then compile to generate DLL");
         }
         else
         {
             ImGui::Text("Select DLL:");
 
-            // DLL selection combo box
             const char* currentDll = availableScripts[selectedScriptIndex].c_str();
             if (ImGui::BeginCombo("##DllCombo", currentDll))
             {
@@ -402,12 +378,10 @@ void ComponentScript::OnEditor()
 
             ImGui::Spacing();
 
-            // Script class selection
             static std::vector<std::string> availableClasses;
             static int selectedClassIndex = 0;
             static std::string lastSelectedDll = "";
 
-            // Update classes when DLL changes
             if (lastSelectedDll != availableScripts[selectedScriptIndex])
             {
                 lastSelectedDll = availableScripts[selectedScriptIndex];
@@ -467,13 +441,10 @@ void ComponentScript::OnEditor()
     }
 }
 
-// ==================== SCRIPT DISCOVERY ====================
-
 std::vector<std::string> ComponentScript::GetAvailableScripts()
 {
     std::vector<std::string> scripts;
 
-    // Scan x64/Debug for compiled .dll files 
     std::string dllFolder = "x64/Debug";
     if (std::filesystem::exists(dllFolder))
     {
@@ -483,7 +454,6 @@ std::vector<std::string> ComponentScript::GetAvailableScripts()
             {
                 std::string dllName = entry.path().stem().string();
 
-                // Avoid system DLLs and temporary DLLs
                 if (dllName != "Engine" && dllName.find("_temp_") == std::string::npos)
                 {
                     scripts.push_back(dllName);
@@ -492,9 +462,7 @@ std::vector<std::string> ComponentScript::GetAvailableScripts()
         }
     }
 
-    // Sort alphabetically
     std::sort(scripts.begin(), scripts.end());
-
     return scripts;
 }
 
@@ -504,23 +472,69 @@ std::vector<std::string> ComponentScript::GetScriptClassesInDLL(const std::strin
 
     if (dllName == "Scripting")
     {
-        classes.push_back("TestingScript");
+        std::string scriptsPath = LibraryManager::GetScriptingRoot();
 
-        // Dont delete this comment - it's a placeholder
-        // ADD MORE SCRIPTS HERE AS YOU CREATE THEM
+        if (std::filesystem::exists(scriptsPath))
+        {
+            for (const auto& entry : std::filesystem::directory_iterator(scriptsPath))
+            {
+                if (!entry.is_regular_file()) continue;
+
+                std::string extension = entry.path().extension().string();
+                if (extension == ".h")
+                {
+                    std::string className = entry.path().stem().string();
+                    classes.push_back(className);
+                }
+            }
+        }
     }
-    // Add more DLLs here as needed
 
     return classes;
 }
 
 bool ComponentScript::BuildScriptingProject()
 {
+    LOG_CONSOLE("Syncing scripts from Assets/Scripts...");
+
+    std::string assetsScripts = LibraryManager::GetScriptingRoot();
+    std::string buildScriptsDir = "Scripting/src";
+
+    if (!std::filesystem::exists(buildScriptsDir))
+    {
+        std::filesystem::create_directories(buildScriptsDir);
+    }
+
+    int copiedFiles = 0;
+    if (std::filesystem::exists(assetsScripts))
+    {
+        for (const auto& entry : std::filesystem::directory_iterator(assetsScripts))
+        {
+            if (!entry.is_regular_file()) continue;
+
+            std::string ext = entry.path().extension().string();
+            if (ext != ".h" && ext != ".cpp") continue;
+
+            std::string dest = buildScriptsDir + "/" + entry.path().filename().string();
+
+            try {
+                std::filesystem::copy_file(entry.path(), dest,
+                    std::filesystem::copy_options::overwrite_existing);
+                copiedFiles++;
+                LOG_DEBUG("Copied: %s", entry.path().filename().string().c_str());
+            }
+            catch (const std::exception& e) {
+                LOG_CONSOLE("Failed to copy %s: %s",
+                    entry.path().filename().string().c_str(), e.what());
+            }
+        }
+    }
+
+    LOG_CONSOLE("Copied %d script files to build directory", copiedFiles);
     LOG_CONSOLE("========================================");
     LOG_CONSOLE("Rebuilding Scripting project...");
     LOG_CONSOLE("========================================");
 
-    // Using CMake with clean-first to force rebuild
     std::string command = "cd \"C:\\Users\\haosh\\Documents\\GitHub\\Motor2025\\Engine\\build\" && "
         "cmake --build . --config Debug --target Scripting --clean-first";
 
@@ -581,7 +595,7 @@ void ComponentScript::ImportBuiltScriptsToLibrary()
 {
     LOG_CONSOLE("[ComponentScript] Importing built scripts to Library...");
 
-    std::string scriptingSrc = LibraryManager::GetScriptingRoot() + "/src";
+    std::string scriptsPath = LibraryManager::GetScriptingRoot();
     std::string dllPath = "x64/Debug/Scripting.dll";
 
     if (!std::filesystem::exists(dllPath)) {
@@ -591,8 +605,7 @@ void ComponentScript::ImportBuiltScriptsToLibrary()
 
     int imported = 0;
 
-    // Scan all .h files in Scripting/src
-    for (const auto& entry : std::filesystem::directory_iterator(scriptingSrc)) {
+    for (const auto& entry : std::filesystem::directory_iterator(scriptsPath)) {
         if (!entry.is_regular_file()) continue;
 
         std::string extension = entry.path().extension().string();
