@@ -16,6 +16,20 @@ typedef void (*ScriptStartFunc)(ScriptInstanceHandle instance);
 typedef void (*ScriptUpdateFunc)(ScriptInstanceHandle instance, float deltaTime);
 typedef void (*ScriptSetAPIFunc)(ScriptingAPI* api);
 
+typedef int (*GetPropertyCountFunc)(ScriptInstanceHandle instance);
+typedef const char* (*GetPropertyNameFunc)(ScriptInstanceHandle instance, int index);
+typedef int (*GetPropertyTypeFunc)(ScriptInstanceHandle instance, int index);
+typedef float (*GetPropertyFloatFunc)(ScriptInstanceHandle instance, int index);
+typedef void (*SetPropertyFloatFunc)(ScriptInstanceHandle instance, int index, float value);
+typedef int (*GetPropertyIntFunc)(ScriptInstanceHandle instance, int index);
+typedef void (*SetPropertyIntFunc)(ScriptInstanceHandle instance, int index, int value);
+typedef bool (*GetPropertyBoolFunc)(ScriptInstanceHandle instance, int index);
+typedef void (*SetPropertyBoolFunc)(ScriptInstanceHandle instance, int index, bool value);
+typedef void (*GetPropertyVec3Func)(ScriptInstanceHandle instance, int index, float* x, float* y, float* z);
+typedef void (*SetPropertyVec3Func)(ScriptInstanceHandle instance, int index, float x, float y, float z);
+typedef float (*GetPropertyMinFunc)(ScriptInstanceHandle instance, int index);
+typedef float (*GetPropertyMaxFunc)(ScriptInstanceHandle instance, int index);
+
 class ComponentScript : public Component
 {
 public:
@@ -70,4 +84,18 @@ private:
     ScriptStartFunc ScriptStart = nullptr;
     ScriptUpdateFunc ScriptUpdate = nullptr;
     ScriptSetAPIFunc ScriptSetAPI = nullptr;
+
+    GetPropertyCountFunc GetPropertyCount = nullptr;
+    GetPropertyNameFunc GetPropertyName = nullptr;
+    GetPropertyTypeFunc GetPropertyType = nullptr;
+    GetPropertyFloatFunc GetPropertyFloat = nullptr;
+    SetPropertyFloatFunc SetPropertyFloat = nullptr;
+    GetPropertyIntFunc GetPropertyInt = nullptr;
+    SetPropertyIntFunc SetPropertyInt = nullptr;
+    GetPropertyBoolFunc GetPropertyBool = nullptr;
+    SetPropertyBoolFunc SetPropertyBool = nullptr;
+    GetPropertyVec3Func GetPropertyVec3 = nullptr;
+    SetPropertyVec3Func SetPropertyVec3 = nullptr;
+    GetPropertyMinFunc GetPropertyMin = nullptr;
+    GetPropertyMaxFunc GetPropertyMax = nullptr;
 };

@@ -110,6 +110,20 @@ void ComponentScript::LoadScript(const std::string& dllName, const std::string& 
     ScriptUpdate = (ScriptUpdateFunc)GetProcAddress(scriptDLL, "ScriptUpdate");
     ScriptSetAPI = (ScriptSetAPIFunc)GetProcAddress(scriptDLL, "ScriptSetAPI");
 
+    GetPropertyCount = (GetPropertyCountFunc)GetProcAddress(scriptDLL, "GetPropertyCount");
+    GetPropertyName = (GetPropertyNameFunc)GetProcAddress(scriptDLL, "GetPropertyName");
+    GetPropertyType = (GetPropertyTypeFunc)GetProcAddress(scriptDLL, "GetPropertyType");
+    GetPropertyFloat = (GetPropertyFloatFunc)GetProcAddress(scriptDLL, "GetPropertyFloat");
+    SetPropertyFloat = (SetPropertyFloatFunc)GetProcAddress(scriptDLL, "SetPropertyFloat");
+    GetPropertyInt = (GetPropertyIntFunc)GetProcAddress(scriptDLL, "GetPropertyInt");
+    SetPropertyInt = (SetPropertyIntFunc)GetProcAddress(scriptDLL, "SetPropertyInt");
+    GetPropertyBool = (GetPropertyBoolFunc)GetProcAddress(scriptDLL, "GetPropertyBool");
+    SetPropertyBool = (SetPropertyBoolFunc)GetProcAddress(scriptDLL, "SetPropertyBool");
+    GetPropertyVec3 = (GetPropertyVec3Func)GetProcAddress(scriptDLL, "GetPropertyVec3");
+    SetPropertyVec3 = (SetPropertyVec3Func)GetProcAddress(scriptDLL, "SetPropertyVec3");
+    GetPropertyMin = (GetPropertyMinFunc)GetProcAddress(scriptDLL, "GetPropertyMin");
+    GetPropertyMax = (GetPropertyMaxFunc)GetProcAddress(scriptDLL, "GetPropertyMax");
+
     if (!CreateScript || !DestroyScript || !ScriptStart || !ScriptUpdate || !ScriptSetAPI)
     {
         LOG_CONSOLE("ERROR: Failed to get function pointers");
@@ -304,7 +318,77 @@ void ComponentScript::OnEditor()
 
     if (scriptLoaded)
     {
-        ImGui::TextColored(ImVec4(0.3f, 1.0f, 0.3f, 1.0f), " Script Loaded");
+        ImGui::TextColored(ImVec4(0.3f, 1.0f, 0.3f, 1.0f), "✓ Script Loaded");
+
+        // MOSTRAR PROPIEDADES DEL SCRIPT
+        if (scriptInstance && GetPropertyCount)
+        {
+            int propCount = GetPropertyCount(scriptInstance);
+
+            if (propCount > 0)
+            {
+                ImGui::Spacing();
+                ImGui::Separator();
+                ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.2f, 1.0f), "📝 Script Properties");
+                ImGui::Spacing();
+
+                for (int i = 0; i < propCount; i++)
+                {
+                    const char* propName = GetPropertyName(scriptInstance, i);
+                    int propType = GetPropertyType(scriptInstance, i);
+
+                    std::string label = "##" + std::string(propName) + std::to_string(i);
+
+                    switch (propType)
+                    {
+                    case 0: // FLOAT
+                    {
+                        if (GetPropertyFloat && SetPropertyFloat && GetPropertyMin && GetPropertyMax)
+                        {
+                            float value = GetPropertyFloat(scriptInstance, i);
+                            float minVal = GetPropertyMin(scriptInstance, i);
+                            float maxVal = GetPropertyMax(scriptInstance, i);
+
+                            ImGui::Text("%s", propName);
+                            if (ImGui::SliderFloat(label.c_str(), &value, minVal, maxVal))
+                            {
+                                SetPropertyFloat(scriptInstance, i, value);
+                            }
+                        }
+                        break;
+                    }
+                    case 1: // INT
+                    {
+                        if (GetPropertyInt && SetPropertyInt)
+                        {
+                            int value = GetPropertyInt(scriptInstance, i);
+                            ImGui::Text("%s", propName);
+                            if (ImGui::InputInt(label.c_str(), &value))
+                            {
+                                SetPropertyInt(scriptInstance, i, value);
+                            }
+                        }
+                        break;
+                    }
+                    case 2: // BOOL
+                    {
+                        if (GetPropertyBool && SetPropertyBool)
+                        {
+                            bool value = GetPropertyBool(scriptInstance, i);
+                            if (ImGui::Checkbox((std::string(propName) + label).c_str(), &value))
+                            {
+                                SetPropertyBool(scriptInstance, i, value);
+                            }
+                        }
+                        break;
+                    }
+                    }
+                }
+
+                ImGui::Spacing();
+                ImGui::Separator();
+            }
+        }
 
         ImGui::Spacing();
         ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.0f, 1.0f), "Hot-Reload: Active");
@@ -440,7 +524,6 @@ void ComponentScript::OnEditor()
         ImGui::PopStyleColor(3);
     }
 }
-
 std::vector<std::string> ComponentScript::GetAvailableScripts()
 {
     std::vector<std::string> scripts;
