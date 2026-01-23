@@ -25,6 +25,10 @@ _Jana Puig_ « **Github**: [JanaPuig](https://github.com/JanaPuig)
 
 ---
 
+## Installation
+**_Unzip the [RELEASE FOLDER](https://github.com/bottzo/Motor2025/releases/tag/Scripting) and execute the .exe file_**
+
+---
 ## 🦀 Controls
 
 | Action | Key 1 | Key 2 |
