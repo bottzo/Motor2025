@@ -11,6 +11,8 @@ In latest version, we've developed in more depth the UI and added a Main Menu, w
 
 <p align="center">
 🔗 <strong>GitHub Repository:</strong> <a href="https://github.com/bottzo/Motor2025/tree/UI---Ivan%2CBernat%2CMaria">https://github.com/bottzo/Motor2025/tree/UI---Ivan%2CBernat%2CMaria</a>
+🔗 <strong>Release:</strong> <a href="https://github.com/bottzo/Motor2025/releases/tag/UI">https://github.com/bottzo/Motor2025/releases/tag/UI</a>
+    
 </p>
 
 ---
